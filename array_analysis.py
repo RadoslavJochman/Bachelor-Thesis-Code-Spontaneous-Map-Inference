@@ -1,6 +1,6 @@
 """
-Analysis
-This script contains main analysis object for
+Array analysis
+This script contains main analysis object
 
 Authors: Karolína Korvasová, Matěj Voldřich
 """

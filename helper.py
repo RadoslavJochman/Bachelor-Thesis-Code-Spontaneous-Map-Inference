@@ -7,7 +7,8 @@ loading human data from nnx file, and preprocess it
     -load_human_data()
 getting coords from electrode index
     -get_coords_from_electrode_human()
-
+Calculate standard score for segments
+    -zscore_segments()
 Authors: Karolína Korvasová, Matěj Voldřich
 """
 
@@ -105,3 +106,11 @@ def get_coords_from_electrode_human(electrode_number):
     x = electrodes_channels_coords_map[electrodes_channels_coords_map['New Electrodes']==electrode_number].x.values[0]
     y = electrodes_channels_coords_map[electrodes_channels_coords_map['New Electrodes']==electrode_number].y.values[0]
     return x,y
+
+def zscore_segments(segments):
+    from scipy.stats import zscore
+    for segment in segments:
+        ansigs = segment.analogsignals[0]
+        segment.analogsignals[0] = neo.AnalogSignal(zscore(ansigs.magnitude, axis=0), units=ansigs.units,
+                                                    t_stop=ansigs.t_stop, sampling_rate=ansigs.sampling_rate)
+    return segments

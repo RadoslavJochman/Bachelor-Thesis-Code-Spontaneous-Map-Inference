@@ -13,7 +13,8 @@ Plotting graph of how RMSE depends on bin size with specific threshold factor an
     -ggplot_rmse_vs_bin_size()
 Plotting RMSE for different samples
     -ggplot_rmse()
-
+Plotting spontaneous maps
+    -ggplot_spontaneous_map()
 Author: Radoslav Jochman
 """
 import pandas as pd
@@ -21,8 +22,12 @@ from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
 from array_analysis import *
 from scipy.stats import linregress
+import helper
 import numpy as np
-from plotnine import ggplot, aes, geom_point, geom_smooth, labs, theme_minimal, scale_color_manual, annotate, scale_shape_manual, geom_hline, scale_y_continuous, scale_x_continuous
+from plotnine import (ggplot, aes, geom_point, geom_smooth, labs, theme_minimal, scale_color_manual,
+                      annotate, scale_shape_manual, geom_hline, scale_y_continuous, scale_x_continuous,
+                      geom_text,coord_equal, scale_fill_gradientn, theme, element_rect,
+                      element_blank, element_text, guides, guide_colorbar)
 
 def find_ideal_rotation(ref: np.ndarray, rot: np.ndarray, n_steps: int=1000):
     """
@@ -317,6 +322,107 @@ def ggplot_rmse(rmse_dic: dict, ref_obj: ArrayAnalysis):
         minor_breaks=None
     )
         + theme_minimal()
+    )
+
+    return p
+
+def ggplot_spontaneous_map(analysis_array, ref):
+    """
+    Generates a spontaneous map plot using plotnine, mimicking the style of ggplot2 in Python.
+
+    This function rotates the spontaneous map from the analysis_array to align with the reference
+    map provided by ref, then constructs a plot that visualizes electrode orientations:
+      - It creates a DataFrame from the rotated map, converting valid orientation values from radians
+        to degrees, and another DataFrame for electrode coordinates and labels obtained from a helper.
+      - A custom HSV color gradient is generated to map orientation values (0° to 180°) to colors.
+      - Axis limits are computed with added margins for a cleaner layout.
+      - The plot is assembled with square markers (colored by orientation), electrode labels on top,
+        an equal coordinate ratio, and a minimal theme with a vertical color bar legend.
+
+    Parameters:
+        analysis_array: An object containing a 'spontaneous_map' attribute (a numpy array of orientation data).
+        ref: A reference object that includes a 'spontaneous_map' attribute (a numpy array of orientation data).
+
+    Returns:
+        A plotnine ggplot object that can be rendered using .draw() or saved using .save(...).
+    """
+
+    # Align spontaneous maps
+    ref_map = ref.spontaneous_map
+    spont_map = analysis_array.spontaneous_map
+    spont_map, _ = find_ideal_rotation(ref_map, spont_map, 10000)
+
+    # Build a DataFrame for valid points:
+    # Use indices (iy, ix) as x and y, and convert orientation (in rad) to degrees.
+    data_list = []
+    for ix in range(spont_map.shape[0]):
+        for iy in range(spont_map.shape[1]):
+            val = spont_map[ix, iy]
+            if val > -0.5:
+                orientation_deg = 180.0 * val / np.pi
+                data_list.append((iy, ix, orientation_deg))
+    df_map = pd.DataFrame(data_list, columns=['x', 'y', 'orientation'])
+
+    # Build a DataFrame for electrode labels
+    n_valid_electrodes = int(np.sum(spont_map > -2))
+    elec_list = []
+    for i in range(n_valid_electrodes):
+        ex, ey = helper.get_coords_from_electrode_human(i + 1)
+        elec_list.append((ex, ey, i + 1))
+    df_elec = pd.DataFrame(elec_list, columns=['x', 'y', 'label'])
+
+    # Create a custom HSV gradient for orientation (0 to 180°)
+    cmap = plt.cm.get_cmap('hsv')
+    n_colors = 256
+    hsv_hex = [mcolors.to_hex(cmap(i/n_colors)) for i in range(n_colors)]
+
+    # Compute x-axis limits with margin.
+    # Use df_map x values, then add 6% extra space on each side.
+    x_min = df_map['x'].min()
+    x_max = df_map['x'].max()
+    x_range = x_max - x_min
+    x_margin = 0.06 * x_range if x_range > 0 else 1
+    x_limits = (x_min - x_margin, x_max + x_margin)
+
+    # Compute y-axis limits from df_map's y values with a margin.
+    y_min = df_map['y'].min()
+    y_max = df_map['y'].max()
+    y_range = y_max - y_min
+    y_margin = 0.06 * y_range if y_range > 0 else 1
+    y_limits = (y_min - y_margin, y_max + y_margin)
+
+    # Construct the plot:
+    p = (
+            ggplot(df_map, aes('x', 'y'))
+            + geom_point(shape='s', size=22, color='black')
+            + geom_point(aes(fill='orientation'), shape='s', size=21)
+            + geom_text(df_elec, aes('x', 'y', label='label'), color='black', size=15)
+            + scale_fill_gradientn(
+        colors=hsv_hex,
+        limits=[0, 180],
+        breaks=[0, 45, 90, 135, 180],
+        name="Estimated orientation (°)"
+    )
+
+        + coord_equal()
+        + labs(x="", y="")
+        + scale_x_continuous(limits=x_limits, expand=(0, 0))
+        + scale_y_continuous(limits=y_limits, expand=(0, 0))
+        + theme_minimal()
+        + theme(
+            panel_background=element_rect(fill='white'),
+            plot_background=element_rect(fill='white'),
+            panel_grid=element_blank(),
+            axis_text=element_blank(),
+            axis_ticks=element_blank(),
+            legend_position='right',
+            legend_key_size=40,
+            legend_text=element_text(size=12),
+            legend_title=element_text(angle=0, size=12, ha='center', va='bottom'),
+            figure_size=(8, 8),
+                )
+        + guides(
+            fill=guide_colorbar(direction='vertical'))
     )
 
     return p

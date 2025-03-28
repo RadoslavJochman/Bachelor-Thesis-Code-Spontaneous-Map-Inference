@@ -28,7 +28,7 @@ def main(args: argparse.Namespace):
     for seg in segments:
         arr_objs.extend([ArrayAnalysis("4",METHODS.nLFP,[split_seg],layout,analysis_params) for split_seg in split_segment(seg,args.segment_size)])
 
-    PC1, PC2 = map(int,args.PCs.split())
+    PC1, PC2 = map(int,args.PCs.split(","))
     for obj in arr_objs:
         compute_spontaneous_map(obj)
         obj.compute_new_PC(PC1, PC2)

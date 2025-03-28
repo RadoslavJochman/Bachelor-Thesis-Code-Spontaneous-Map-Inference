@@ -31,3 +31,7 @@ def main(args: argparse.Namespace):
     PCs = args.PCs.split(",")
     arr_obj.compute_new_PC(PCs[0],PCs[1])
     arr_obj.save_lightweight(f'{args.result_dir}/{args.result_name}')
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    main(args)

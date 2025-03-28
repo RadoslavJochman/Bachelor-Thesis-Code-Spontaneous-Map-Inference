@@ -245,3 +245,9 @@ def trim_layout(layout):
         x.append(layout['x'][i])
         y.append(layout['y'][i])
     return pd.DataFrame({'chn': chn, 'x': x, 'y': y})
+
+def load_object(pickle_path):
+    with open(pickle_path, "rb") as f:
+        arr_obj = pickle.load(f)
+    arr_obj.load_layout(arr_obj._layout)
+    return arr_obj

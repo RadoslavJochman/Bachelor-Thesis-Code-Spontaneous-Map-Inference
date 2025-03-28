@@ -1,3 +1,6 @@
+"""
+Author: Radoslav Jochman
+"""
 import argparse
 import plotting
 import pandas as pd

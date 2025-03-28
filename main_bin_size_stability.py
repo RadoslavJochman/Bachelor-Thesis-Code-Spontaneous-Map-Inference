@@ -1,3 +1,6 @@
+"""
+Author: Radoslav Jochman
+"""
 import pandas as pd
 from array_analysis import ArrayAnalysis, METHODS
 import yaml

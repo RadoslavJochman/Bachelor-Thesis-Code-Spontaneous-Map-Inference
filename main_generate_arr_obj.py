@@ -1,3 +1,6 @@
+"""
+Author: Radoslav Jochman
+"""
 import pandas as pd
 import yaml
 import argparse

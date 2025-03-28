@@ -1,3 +1,7 @@
+"""
+Author: Radoslav Jochman
+"""
+
 import os
 import argparse
 from array_analysis import load_object

@@ -31,8 +31,8 @@ def main(args: argparse.Namespace):
     arr_obj = ArrayAnalysis("4",METHODS.nLFP,segments,layout,analysis_params)
 
     compute_spontaneous_map(arr_obj)
-    PCs = args.PCs.split(",")
-    arr_obj.compute_new_PC(PCs[0],PCs[1])
+    PC1, PC2 = map(int,args.PCs.split(","))
+    arr_obj.compute_new_PC(PC1, PC2)
     arr_obj.save_lightweight(f'{args.result_dir}/{args.result_name}')
 
 if __name__ == '__main__':

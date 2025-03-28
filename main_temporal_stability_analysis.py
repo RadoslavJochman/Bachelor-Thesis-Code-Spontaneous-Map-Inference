@@ -35,7 +35,7 @@ def main(args: argparse.Namespace):
     ref_obj = arr_objs[0]
     rmse = {}
     for i,obj in enumerate(arr_objs):
-        rot, _ = plotting.find_ideal_rotation(ref_obj.spontaneous_map,obj.spontaneous_map)
+        rot = plotting.find_ideal_rotation(ref_obj.spontaneous_map,obj.spontaneous_map)
         rmse[f"{i}"] = plotting.rmse_angles(rot,ref_obj.spontaneous_map)
     p = plotting.ggplot_rmse(rmse,ref_obj)
     p = p + theme(

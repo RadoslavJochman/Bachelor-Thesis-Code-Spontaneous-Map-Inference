@@ -350,7 +350,7 @@ def ggplot_spontaneous_map(analysis_array, ref):
     # Align spontaneous maps
     ref_map = ref.spontaneous_map
     spont_map = analysis_array.spontaneous_map
-    spont_map, _ = find_ideal_rotation(ref_map, spont_map, 10000)
+    spont_map = find_ideal_rotation(ref_map, spont_map, 10000)
 
     # Build a DataFrame for valid points:
     # Use indices (iy, ix) as x and y, and convert orientation (in rad) to degrees.

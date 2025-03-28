@@ -45,35 +45,31 @@ def segments_subtract_mean(segments):
         segment.analogsignals = analog_signal - np.mean(analog_signal,axis=0)
     return segments
 
-def load_human_segments(data_location: str, layout_path: str, **kwargs):
+def load_human_segments(data_location: str, params: dict):
     """
     Loads and processes neural recording segments from multiple file types (NIX, NS6, NS5, NS2).
 
     Parameters:
         data_location (str):
-            Path to either a directory of data files or a text file listing data paths.
-        layout_path (str):
-            Path to a CSV file containing a layout with a "chn" column indicating valid channels.
-        **kwargs:
-            threshold_factor (float):
-                Threshold factor for event detection. Required by `preprocessing.nLFP`.
-            filter (dict):
-                Dictionary specifying filters or filtering parameters used in `preprocessing.nLFP`.
-            subtract_mean (bool):
-                If True, subtracts the mean (over time) from each channel in each segment.
-            z_score (bool):
-                If True, applies z-score normalization to segments before mean subtraction.
+            Path to a directory containing data files or a text file listing the paths to data files.
+        params (dict):
+            Dictionary of additional processing parameters. Expected keys include:
+              - threshold_factor (float): Factor for event detection used by preprocessing.nLFP.
+              - filter (dict): Dictionary specifying filters or filtering parameters for preprocessing.nLFP.
+              - subtract_mean (bool): If True, subtracts the mean (over time) from each channel in the segments.
+              - z_score (bool): If True, applies z-score normalization to the segments prior to mean subtraction.
+              - layout_path (str): Path to a CSV file with layout information, including a "chn" column indicating valid channels.
 
     Returns:
         list of neo.Segment:
-            A list of Neo Segment objects, each containing loaded and processed analog signals.
-            All segments share a consistent format for further analysis.
-     """
+            A list of neo.Segment objects, each containing loaded and processed analog signals formatted
+            consistently for further analysis.
+    """
 
     #Generate paths from directory or text file
     paths = extract_paths(data_location)
     # Read layout, get number of channels
-    layout = pd.read_csv(layout_path)
+    layout = pd.read_csv(params["layout_path"])
     n_channels = np.sum(~np.isnan(layout["chn"]))
 
     # The nix file that the Prague lab makes is configured to have in each segment  n_channels
@@ -104,20 +100,19 @@ def load_human_segments(data_location: str, layout_path: str, **kwargs):
                                range(n_channels)]
             segments.append(s)
 
-    if 'z_score' in kwargs.keys() and kwargs['z_score']:
-        segments = preprocessing.zscore_segments(segments)
+    if 'z_score' in params.keys() and params['z_score']:
+        segments = zscore_segments(segments)
 
     # subtract signal mean of from all channels
-    if 'subtract_mean' in kwargs.keys() and kwargs['subtract_mean']:
+    if 'subtract_mean' in params.keys() and params['subtract_mean']:
         segments = segments_subtract_mean(segments)
-        segments = [preprocessing.nLFP(segment, kwargs['threshold_factor'], kwargs['filter'],tag="human").segments[0]
+        segments = [preprocessing.nLFP(segment, params['threshold_factor'], params['filter'],tag="human").segments[0]
                     for segment in segments]
     else:
-        segments = [preprocessing.nLFP(segment, kwargs['threshold_factor'], kwargs['filter'],tag="human").segments[0]
+        segments = [preprocessing.nLFP(segment, params['threshold_factor'], params['filter'],tag="human").segments[0]
                     for segment in segments]
 
     return segments
-
 
 def get_coords_from_electrode_human(electrode_number):
 
@@ -162,3 +157,36 @@ def extract_paths(data_location: str):
         paths = os.listdir(data_location)
         paths = [f'{data_location}/{name}' for name in paths]
     return paths
+
+def split_segment(segment: neo.Segment, duration_s: int) -> list[neo.Segment]:
+    """
+    Splits a neo.Segment's analog signals into smaller segments of equal duration.
+
+    This function takes an input neo.Segment and divides its contained analog signals
+    into multiple new segments, each spanning 'duration_s' seconds. It operates under the
+    assumption that all analog signals within the segment share the same sampling rate,
+    units, and total duration.
+
+    Parameters:
+        segment (neo.Segment): The input segment containing analog signals to be split.
+        duration_s (int): The desired duration (in seconds) for each output segment.
+
+    Returns:
+        list[neo.Segment]: A list of new neo.Segment objects, each holding a subset of the
+        original analog signals corresponding to the specified segment duration.
+    """
+
+    segments = []
+    ansigs = segment.analogsignals
+    fq = segment.analogsignals[0].sampling_rate
+    units = segment.analogsignals[0].units
+    duration_time_s = segment.analogsignals[0].t_stop
+    duration_time_s.units = "s"
+    num_samples = int(duration_time_s.item() // duration_s)
+    duration_num_values = segment.analogsignals[0].shape[0]
+    duration_per_sample = int(duration_num_values//num_samples)
+    for i in range(num_samples):
+        s = neo.Segment()
+        s.analogsignals = [neo.AnalogSignal(ansigs[j][i*duration_per_sample:(i+1)*duration_per_sample,:], units=units, sampling_rate=fq) for j in range(len(segment.analogsignals))]
+        segments.append(s)
+    return segments

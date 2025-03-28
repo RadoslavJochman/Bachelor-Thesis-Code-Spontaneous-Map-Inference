@@ -14,7 +14,6 @@ import quantities as pq
 import elephant
 import numpy as np
 from neo import NixIO, BlackrockIO, Segment, AnalogSignal, Block
-import elephant.spike_train_synchrony as sts
 
 
 def LFP(path):

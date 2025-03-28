@@ -13,9 +13,7 @@ This script contains functions for
 Authors: Karolína Korvasová, Matěj Voldřich
 """
 
-import matplotlib.pyplot as plt
 import scipy.stats
-import helper
 from array_analysis import ArrayAnalysis, METHODS
 import numpy as np
 from sklearn.decomposition import PCA

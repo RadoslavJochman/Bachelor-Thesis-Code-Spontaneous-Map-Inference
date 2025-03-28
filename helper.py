@@ -16,14 +16,9 @@ Modifications by: Radoslav Jochman
 import neo
 import numpy as np
 import os
-
-import yaml
-import quantities as pq
 import preprocessing
-from array_analysis import ArrayAnalysis, METHODS
 import pandas as pd
 from blackrock_utilities.brpylib             import NevFile, NsxFile, brpylib_ver
-from neo import  AnalogSignal
 from quantities import  Hz
 
 def segments_subtract_mean(segments):

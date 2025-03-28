@@ -17,12 +17,9 @@ Plotting RMSE for different samples
 Author: Radoslav Jochman
 """
 import pandas as pd
-import helper
-import argparse
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
 from array_analysis import *
-from datetime import datetime
 from scipy.stats import linregress
 import numpy as np
 from plotnine import ggplot, aes, geom_point, geom_smooth, labs, theme_minimal, scale_color_manual, annotate, scale_shape_manual, geom_hline, scale_y_continuous, scale_x_continuous

@@ -1,7 +1,5 @@
 import pandas as pd
-
 from array_analysis import ArrayAnalysis, METHODS
-from blackrock_utilities.brpylib             import NevFile, NsxFile, brpylib_ver
 import yaml
 from helper import load_human_segments
 from analysis import compute_spontaneous_map

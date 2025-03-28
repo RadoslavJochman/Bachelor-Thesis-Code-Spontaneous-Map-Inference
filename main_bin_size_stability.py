@@ -30,10 +30,7 @@ def main(args):
     for bin_size in bin_sizes:
         params_analysis["event_binsize"] = bin_size
 
-        segments = load_human_segments(args.data_dir, params['layout_path'],
-                                  subtract_mean=params['subtract_mean'],
-                                  threshold_factor=params['threshold_factor'],
-                                  filter=params['filter'], z_score=params['z-score'])
+        segments = load_human_segments(args.data_dir, params)
 
         arr_obj = ArrayAnalysis("4",METHODS.nLFP,segments,layout,params_analysis)
         compute_spontaneous_map(arr_obj)

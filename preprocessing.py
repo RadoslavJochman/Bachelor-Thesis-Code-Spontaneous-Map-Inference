@@ -19,9 +19,26 @@ import elephant.spike_train_synchrony as sts
 
 def LFP(path):
     """
-    Load raw recording from ns6/nix file and extract LFP signal.
-    :param path:
-    :return:
+    Loads a raw neural recording file (ns5/ns6/NIX) and extracts the LFP (Local Field Potential) signal.
+
+    This function performs several processing steps:
+      1. Reads a neural data file using `BlackrockIO` (for ns5/ns6) or `NixIO` (for NIX format).
+      2. Retrieves the first segment and extracts the AnalogSignal.
+      3. Applies a low-pass filter (150 Hz), then downsamples the signal from 30 kHz to 500 Hz.
+      4. Removes line noise at 50 Hz, 100 Hz, and 150 Hz using bandstop filters.
+      5. Constructs a `Block` containing a single `Segment` with the processed AnalogSignal.
+
+    Parameters:
+        path (str):
+            Path to the data file. Supported formats:
+              - Blackrock ns5 or ns6
+              - NIX (.nix)
+
+    Returns:
+        neo.Block:
+            A Neo `Block` object containing:
+              - A single `Segment` with one downsampled, filtered `AnalogSignal` in mV,
+                sampled at 1000 Hz with shape (n_timepoints, n_channels)
     """
     if "ns6" in path or "ns5" in path:
         bl = BlackrockIO(path).read_block()
@@ -29,26 +46,23 @@ def LFP(path):
         bl = NixIO(path, "ro").read_block()
     seg = bl.segments[0]
 
-    ansignals = []
+    anasignals = []
     for i in range(seg.analogsignals[0].shape[1]):
         anasig = seg.analogsignals[0][:, i]
         anasig = anasig.reshape(anasig.shape[0])
         # 2. Filter the signal between 1Hz and 150Hz
         anasig = butter(anasig, lowpass_frequency=150.0 * pq.Hz)
 
-        # 3. Downsample signal from 30kHz to 500Hz resolution (factor 60)
+        # 3. Downsample signal from 30kHz to 1000Hz resolution (factor 30)
         anasig = anasig.downsample(30, ftype='fir')
 
         # 4. Bandstop filter the 50, 100 and 150 Hz frequencies
         # Compensates for artifacts from the European electric grid
         for fq in [50, 100, 150]:
             anasig = butter(anasig, highpass_frequency=(fq + 2) * pq.Hz, lowpass_frequency=(fq - 2) * pq.Hz)
-        # seg.analogsignals[0][:, i] = anasig
-        ansignals.append(anasig)
-    ansignals = np.array(ansignals)
-    ansignals = ansignals.reshape((ansignals.shape[0], ansignals.shape[1])).T
+        anasignals.append(anasig.rescale('mV'))
     seg = Segment()
-    seg.analogsignals.append(AnalogSignal(np.array(ansignals).T, units=pq.mV, sampling_rate=1000 * pq.Hz))
+    seg.analogsignals = [anasignals[i] for i in range(len(anasignals))]
     bl = Block()
     bl.segments.append(seg)
     return bl

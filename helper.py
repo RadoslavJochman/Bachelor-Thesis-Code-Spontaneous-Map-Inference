@@ -23,7 +23,7 @@ Modifications by: Radoslav Jochman
 from argparse import ArgumentError
 import neo
 import numpy as np
-from array_analysis import ArrayAnalysis
+from array_analysis import ArrayAnalysis, load_object
 import os
 import preprocessing
 import pandas as pd
@@ -381,3 +381,21 @@ def get_bin_size(path):
         bin_size = split_name[bin_index].split(".")[0:2]
         return bin_size
     else: return None
+
+def calculate_rmse_distr_for_sample(paths: list[str],PCs: list[int], ref_obj_path, sample: str):
+    result = pd.DataFrame(columns=["sample","bin size","PC pair", "TH", "rmse"])
+    ref_obj = load_object(ref_obj_path)
+    for PC1 in PCs:
+        for PC2 in PCs:
+            if PC1 < PC2:
+                ref_obj.compute_new_PC(PC1, PC2)
+                for path in paths:
+                    TH = get_TH(path)
+                    bin_size = get_bin_size(path)
+                    arr_obj = load_object(path)
+                    arr_obj.compute_new_PC(PC1, PC2)
+                    arr_map = find_ideal_rotation(ref_obj.spontaneous_map,arr_obj.spontaneous_map)
+                    rmse = rmse_angles(arr_map,ref_obj.spontaneous_map)
+                    result = pd.concat([result,[sample,bin_size,f"{PC1},{PC2}",TH,rmse]],ignore_index=True)
+    return result
+

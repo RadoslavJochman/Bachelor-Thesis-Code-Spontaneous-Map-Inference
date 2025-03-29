@@ -138,6 +138,7 @@ class ArrayAnalysis:
     def compute_new_PC(self,PC1,PC2):
         good_value_inds = [i for i in range(self.n_channels) if i + 1 not in self.deleted_channels]
         points_2d = self._points_PCA[:, [PC1, PC2]]
+        self.params["target_PCA_dims"] = [PC1, PC2]
         # PCA analysis - project data onto PCA plane and compute angles
         data_center = np.mean(points_2d, axis=0)
         points_ref = points_2d - data_center

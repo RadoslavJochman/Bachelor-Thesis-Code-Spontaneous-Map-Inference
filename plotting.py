@@ -19,7 +19,8 @@ import numpy as np
 from plotnine import (ggplot, aes, geom_point, geom_smooth, labs, theme_minimal, scale_color_manual,
                       annotate, scale_shape_manual, geom_hline, scale_y_continuous, scale_x_continuous,
                       geom_text,coord_equal, scale_fill_gradientn, theme, element_rect,
-                      element_blank, element_text, guides, guide_colorbar)
+                      element_blank, element_text, guides, guide_colorbar, geom_boxplot, facet_grid, geom_tile,
+                      facet_wrap,scale_fill_gradient, as_labeller)
 
 def ggplot_rmse_vs_bin_size(df: pd.DataFrame):
     """
@@ -300,3 +301,57 @@ def ggplot_spontaneous_map(analysis_array, ref):
     )
 
     return p
+
+def ggplot_heatmap_param(df_results):
+    """
+    Expects df_results to have columns:
+      - bin_size (float)
+      - TH (e.g. -1, -2, -3)
+      - PC_pair (string like "0-1", "0-2", etc.)
+      - RMSE (float)
+
+    Creates a faceted heatmap:
+      - x-axis: bin_size (continuous)
+      - y-axis: threshold (discrete)
+      - fill: RMSE
+      - one facet per PC_pair
+    """
+
+
+    df_plot = df_results.copy()
+    df_plot['TH'] = df_plot['TH'].astype(str)
+
+    #Define a limited set of breaks for bin_size ticks
+    y_breaks = np.arange(np.min(df_plot["bin_size"]),np.max(df_plot["bin_size"]),0.15)
+
+    #Define labels for facets using TH values
+    th_labels = {}
+    for TH in df_plot['TH']:
+        th_labels[TH] = f"Threshold {TH}"
+
+
+    # 3) Build the heatmap
+    p = (
+        ggplot(df_plot, aes(x='PC_pair', y='bin_size', fill='RMSE'))
+        + geom_tile()
+        + facet_wrap('~TH', ncol=len(th_labels.keys()), labeller=as_labeller(th_labels))
+        + scale_fill_gradient(low='yellow', high='red')
+        + scale_y_continuous(breaks=y_breaks)  # fewer x ticks
+        + labs(
+            title="RMSE over Parameter Grid",
+            x="PC pair",
+            y="Bin Size",
+            fill="RMSE"
+        )
+        + theme_minimal()
+        + theme(
+            panel_background=element_rect(fill='white'),
+            plot_background=element_rect(fill='white'),
+            # 4) Make the figure wide enough to accommodate many facets
+            figure_size=(30, 6),
+            # Rotate x-axis labels 90° to avoid overlap
+            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1)
+        )
+    )
+    return p
+

@@ -189,7 +189,7 @@ def load_human_segments(data_location: str, params: dict):
     """
 
     #Generate paths from directory or text file
-    paths = extract_paths(data_location)
+    paths = extract_pickle_paths(data_location)
     # Read layout, get number of channels
     layout = pd.read_csv(params["layout_path"])
     n_channels = np.sum(~np.isnan(layout["chn"]))
@@ -251,7 +251,7 @@ def zscore_segments(segments):
                                                     t_stop=ansigs.t_stop, sampling_rate=ansigs.sampling_rate)
     return segments
 
-def extract_paths(data_location: str):
+def extract_pickle_paths(data_location: str):
     """
     Extracts file paths based on the given data location.
 
@@ -274,10 +274,10 @@ def extract_paths(data_location: str):
     if os.path.isfile(data_location):
         with open(data_location) as f:
             paths = f.readlines()
-            paths = [p.strip() for p in paths]
+            paths = [p.strip() for p in paths if ".pkl" in p]
     else:
         paths = os.listdir(data_location)
-        paths = [f'{data_location}/{name}' for name in paths]
+        paths = [f'{data_location}/{name}' for name in paths if ".pkl" in name]
     return paths
 
 def split_segment(segment: neo.Segment, duration_s: int) -> list[neo.Segment]:
@@ -373,17 +373,17 @@ def get_TH(path):
     else: return None
 
 def get_bin_size(path):
-    """Extract and return the bin size value from the filename after 'bin_size', or None if not found."""
+    """Extract and return the bin size value from the filename after 'size', or None if not found."""
     file_name = os.path.basename(path)
     split_name = file_name.split("_")
-    if ("bin_size" in split_name):
-        bin_index = split_name.index("bin_size") + 1
-        bin_size = split_name[bin_index].split(".")[0:2]
+    if ("size" in split_name):
+        bin_index = split_name.index("size") + 1
+        bin_size = ".".join(split_name[bin_index].split(".")[0:2])
         return bin_size
     else: return None
 
 def calculate_rmse_distr_for_sample(paths: list[str],PCs: list[int], ref_obj_path, sample: str):
-    result = pd.DataFrame(columns=["sample","bin size","PC pair", "TH", "rmse"])
+    result = pd.DataFrame(columns=["sample","bin_size","PC_pair", "TH", "RMSE"])
     ref_obj = load_object(ref_obj_path)
     for PC1 in PCs:
         for PC2 in PCs:
@@ -396,6 +396,6 @@ def calculate_rmse_distr_for_sample(paths: list[str],PCs: list[int], ref_obj_pat
                     arr_obj.compute_new_PC(PC1, PC2)
                     arr_map = find_ideal_rotation(ref_obj.spontaneous_map,arr_obj.spontaneous_map)
                     rmse = rmse_angles(arr_map,ref_obj.spontaneous_map)
-                    result = pd.concat([result,[sample,bin_size,f"{PC1},{PC2}",TH,rmse]],ignore_index=True)
+                    result = pd.concat([pd.DataFrame([[sample,bin_size,f"{PC1},{PC2}",TH,rmse]], columns=result.columns),result],ignore_index=True)
     return result
 

@@ -347,64 +347,37 @@ def calculate_rmse_dist_for_pcs(arr_obj:ArrayAnalysis, ref_obj:ArrayAnalysis, PC
     result["rmse"] = result_rmse
     return result
 
-def filter_paths_by_TH(paths: str, TH: int):
-    """
-    Filters file paths by matching the threshold value specified after the 'fac' keyword in the filename.
-
-    For each file path in `paths`, the function splits the filename by underscores, searches for the keyword "fac",
-    and checks if the immediately following element matches the string representation of the provided threshold (TH).
-    Only file paths that meet this condition are returned. If a filename does not contain "fac", an ArgumentError is raised.
-
-    Parameters:
-        paths (list of str): List of file paths to filter.
-        TH (int): The threshold value to match; expected to follow the "fac" keyword in the filename.
-
-    Returns:
-        list of str: A list of file paths whose filenames contain "fac" followed by the specified threshold value.
-
-    Raises:
-        ArgumentError: If a filename does not contain the "fac" keyword.
-    """
+def filter_paths_by_TH(paths: list[str], TH: int):
+    """Return file paths whose filename contains the threshold value (as string) immediately following 'fac'."""
     filtered_paths = []
     for path in paths:
-        file_name = os.path.basename(path)
-        split_name = file_name.split("_")
-        if ("fac" in split_name):
-            th_index = split_name.index("fac")+1
-            if(split_name[th_index]==str(TH)):
-                filtered_paths.append(path)
-        else:
-            raise ArgumentError(message='The file name doesn\'t contain \"TH_fac_*\".')
+        if(get_TH(path)!=None and get_TH(path)==str(TH)):
+            filtered_paths.append(path)
     return filtered_paths
 
-def filter_paths_by_bin_size(paths: str, bin_size: int):
-    """
-    Filters file paths by matching the bin size specified after the 'bin_size' keyword in the filename.
-
-    For each file path in `paths`, the function splits the filename by underscores, searches for the keyword "bin_size",
-    and extracts the bin size value that follows. It then compares the extracted value (after processing) to the provided
-    bin_size (converted to string). Only file paths with a matching bin size are returned. If a filename does not contain
-    "bin_size", an ArgumentError is raised.
-
-    Parameters:
-        paths (list of str): List of file paths to filter.
-        bin_size (int): The bin size value to match; expected to follow the "bin_size" keyword in the filename.
-
-    Returns:
-        list of str: A list of file paths whose filenames contain "bin_size" followed by the specified bin size.
-
-    Raises:
-        ArgumentError: If a filename does not contain the "bin_size" keyword.
-    """
+def filter_paths_by_bin_size(paths: list[str], bin_size: int):
+    """Return file paths whose filename contains the bin size (as string) immediately following 'bin_size'."""
     filtered_paths = []
     for path in paths:
-        file_name = os.path.basename(path)
-        split_name = file_name.split("_")
-        if ("bin_size" in split_name):
-            bin_index = split_name.index("bin_size")+1
-            bin = split_name[bin_index].split(".")[0:2]
-            if(bin==str(bin_size)):
-                filtered_paths.append(path)
-        else:
-            raise ArgumentError(message='The file name doesn\'t contain \"bin_size_*\".')
+        if(get_bin_size(path)!=None and get_bin_size(path)==str(bin_size)):
+            filtered_paths.append(path)
     return filtered_paths
+
+def get_TH(path):
+    """Extract and return the threshold value from the filename after 'fac', or None if not found."""
+    file_name = os.path.basename(path)
+    split_name = file_name.split("_")
+    if ("fac" in split_name):
+        th_index = split_name.index("fac") + 1
+        return split_name[th_index]
+    else: return None
+
+def get_bin_size(path):
+    """Extract and return the bin size value from the filename after 'bin_size', or None if not found."""
+    file_name = os.path.basename(path)
+    split_name = file_name.split("_")
+    if ("bin_size" in split_name):
+        bin_index = split_name.index("bin_size") + 1
+        bin_size = split_name[bin_index].split(".")[0:2]
+        return bin_size
+    else: return None

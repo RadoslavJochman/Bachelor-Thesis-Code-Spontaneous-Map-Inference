@@ -1,6 +1,14 @@
 """
 Helper
 This script contains functions for
+Aligning spontaneous map to a reference map
+    -find_ideal_rotation()
+Calculating circular difference between two spontaneous maps
+    -circ_diff()
+Calculating RMSE of two spontaneous maps
+    -rmse_angles()
+Generating control distribution of RMSE and calculating percentile
+    -generate_rmse_distr()
 subtracting mean across all channels from segments
     -segments_subtract_mean()
 loading human data from nnx file, and preprocess it
@@ -12,14 +20,133 @@ Calculate standard score for segments
 Authors: Karolína Korvasová, Matěj Voldřich
 Modifications by: Radoslav Jochman
 """
-
+from argparse import ArgumentError
 import neo
 import numpy as np
+from array_analysis import ArrayAnalysis
 import os
 import preprocessing
 import pandas as pd
 from blackrock_utilities.brpylib             import NevFile, NsxFile, brpylib_ver
 from quantities import  Hz
+
+def find_ideal_rotation(ref: np.ndarray, rot: np.ndarray, n_steps: int=5000):
+    """
+    Finds the rotation offset (from 0 to π) that best aligns a given spontaneous map to a reference map.
+
+    This function evaluates equally spaced rotation offsets (steps) within [0, π] and applies each offset
+    to the map `rot`. It then computes the circular difference between the offset map and the reference map
+    `ref` (using mean squared error as a criterion), selecting the offset that yields the smallest MSE.
+
+    Parameters:
+        ref (numpy.ndarray):
+            The reference spontaneous map (2D array).
+        rot (numpy.ndarray):
+            The map to be aligned (2D array with same shape as 'ref').
+        n_steps (int, optional):
+            Number of rotation increments in the search space, evenly distributed from 0 to π.
+            A larger value produces finer precision but increases computational cost.
+
+    Returns:
+        numpy.ndarray:
+            The best-aligned map.
+    """
+
+    steps = np.linspace(0, np.pi, n_steps)
+    best_err = np.inf
+    best_rotated = None
+
+    for step in steps:
+        candidate = np.mod(rot + step, np.pi)
+        diff = circ_diff(ref, candidate)
+        err = np.mean(diff ** 2)
+        if err < best_err:
+            best_err = err
+            best_rotated = candidate
+    #mark the corners as no valid
+    best_rotated[0, 0] = -2
+    best_rotated[0, 9] = -2
+    best_rotated[9, 0] = -2
+    best_rotated[9, 9] = -2
+    return best_rotated
+
+def circ_diff(a, b):
+    """
+    Computes the circular difference (with a period of π) between two spontaneous maps.
+
+    This function calculates the absolute difference between two angles (or angle arrays),
+    then adjusts it to ensure the difference is within the range [0, π/2], effectively
+    treating π as a full period.
+
+    Parameters:
+        a: float or array-like
+            The first angle or collection of angles in radians. Typically in [0, π).
+        b: float or array-like
+            The second angle or collection of angles in radians. Typically in [0, π).
+
+    Returns:
+        float or numpy.ndarray:
+            The circular difference between the inputs, within the range [0, π/2].
+            If inputs are arrays, the output is an array of the same shape.
+    """
+    diff = np.abs(a - b)
+    return np.minimum(diff, np.pi - diff)
+
+def rmse_angles(a, b):
+    """
+    Calculates the root mean square error (RMSE) for two angle arrays, accounting for circular difference.
+
+    This function uses `circ_diff` to compute the circular difference (period of π) between corresponding
+    angles in `a` and `b`, then calculates the square root of the mean of the squared differences.
+
+    Parameters:
+        a (array-like):
+            The first set of angles in radians.
+        b (array-like):
+            The second set of angles in radians, typically matching `a`.
+
+    Returns:
+        float:
+            The RMSE value representing the circular difference between `a` and `b`.
+    """
+    differences = circ_diff(a, b)
+    mse = np.mean(differences**2)
+    return np.sqrt(mse)
+
+def generate_rmse_distr(ref_map: np.ndarray, n_iter: int=2000, percentile: int=1):
+    """
+    Creates a distribution of RMSE values by randomly permuting a reference map and aligning each permutation
+    back to the original.
+
+    The function performs the following steps for each iteration:
+      1. Flattens `ref_map` and randomly permutes its elements, then reshapes it to the original shape.
+      2. Aligns the permuted map to the reference map using `find_ideal_rotation`.
+      3. Computes the RMSE between the reference map and the aligned permutation using `rmse_angles`.
+      4. Collects these RMSE values into a list.
+
+    After all iterations, the function returns the specified percentile value of the resulting RMSE distribution.
+    This process can be used to estimate a baseline or threshold for statistical analysis when comparing map
+    alignments.
+
+    Parameters:
+        ref_map (numpy.ndarray):
+            The reference spontaneous map, typically a 2D array.
+        n_iter (int, optional):
+            Number of random permutations to generate. Default is 2000.
+        percentile (float, optional):
+            Which percentile of the RMSE distribution to return. Default is 1 (1st percentile).
+
+    Returns:
+        float:
+            The selected percentile from the distribution of RMSE values obtained from random permutations.
+    """
+    rmse_dist = []
+    for i in range(n_iter):
+        permut_map = np.random.permutation(ref_map.flatten()).reshape(ref_map.shape)
+        permut_map = find_ideal_rotation(ref_map,permut_map)
+        rmse = rmse_angles(ref_map,permut_map)
+        rmse_dist.append(rmse)
+    return np.percentile(np.array(rmse_dist), percentile)
 
 def segments_subtract_mean(segments):
     """
@@ -185,3 +312,37 @@ def split_segment(segment: neo.Segment, duration_s: int) -> list[neo.Segment]:
         s.analogsignals = [neo.AnalogSignal(ansigs[j][i*duration_per_sample:(i+1)*duration_per_sample,:], units=units, sampling_rate=fq) for j in range(len(segment.analogsignals))]
         segments.append(s)
     return segments
+
+def calculate_rmse_dist_for_pcs(arr_obj:ArrayAnalysis, ref_obj:ArrayAnalysis, PCs: list ):
+    """
+    Computes the RMSE between spontaneous maps for each unique pair of principal components (PCs) from two ArrayAnalysis objects.
+
+    Parameters:
+          arr_obj (ArrayAnalysis): The analysis object for which the spontaneous map is computed using each PC pair.
+          ref_obj (ArrayAnalysis): The reference analysis object for which the spontaneous map is computed using each PC pair.
+          PCs (list): A list of principal component; at least two must be provided.
+
+    Returns:
+      pd.DataFrame: A DataFrame with columns "PCs" (PC pair as a string, e.g., "3,4") and "rmse" (the computed RMSE value for that pair).
+
+    Raises:
+      ArgumentError: If fewer than 2 principal components are provided in the PCs list.
+    """
+    if len(PCs)<2:
+        raise ArgumentError(message="Need at least 2 PCs.")
+    result_PCs = []
+    result_rmse = []
+    result = pd.DataFrame()
+    for PC1 in PCs:
+        for PC2 in PCs:
+            if PC1<PC2:
+                arr_obj.compute_new_PC(PC1, PC2)
+                ref_obj.compute_new_PC(PC1, PC2)
+                ref_map = ref_obj.spontaneous_map
+                arr_map = arr_obj.spontaneous_map
+                arr_map = find_ideal_rotation(ref_map,arr_map)
+                result_PCs.append(f"{PC1},{PC2}")
+                result_rmse.append(rmse_angles(ref_map,arr_map))
+    result["PCs"] = result_PCs
+    result["rmse"] = result_rmse
+    return result

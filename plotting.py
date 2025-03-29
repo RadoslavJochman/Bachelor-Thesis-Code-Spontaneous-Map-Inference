@@ -1,14 +1,6 @@
 """
 Plotting
 This script contains functions for
-Aligning spontaneous map to a reference map
-    -find_ideal_rotation()
-Calculating circular difference between two spontaneous maps
-    -circ_diff()
-Calculating RMSE of two spontaneous maps
-    -rmse_angles()
-Generating control distribution of RMSE and calculating percentile
-    -generate_rmse_distr()
 Plotting graph of how RMSE depends on bin size with specific threshold factor and PCs
     -ggplot_rmse_vs_bin_size()
 Plotting RMSE for different samples
@@ -28,124 +20,6 @@ from plotnine import (ggplot, aes, geom_point, geom_smooth, labs, theme_minimal,
                       annotate, scale_shape_manual, geom_hline, scale_y_continuous, scale_x_continuous,
                       geom_text,coord_equal, scale_fill_gradientn, theme, element_rect,
                       element_blank, element_text, guides, guide_colorbar)
-
-def find_ideal_rotation(ref: np.ndarray, rot: np.ndarray, n_steps: int=1000):
-    """
-    Finds the rotation offset (from 0 to π) that best aligns a given spontaneous map to a reference map.
-
-    This function evaluates equally spaced rotation offsets (steps) within [0, π] and applies each offset
-    to the map `rot`. It then computes the circular difference between the offset map and the reference map
-    `ref` (using mean squared error as a criterion), selecting the offset that yields the smallest MSE.
-
-    Parameters:
-        ref (numpy.ndarray):
-            The reference spontaneous map (2D array).
-        rot (numpy.ndarray):
-            The map to be aligned (2D array with same shape as 'ref').
-        n_steps (int, optional):
-            Number of rotation increments in the search space, evenly distributed from 0 to π.
-            A larger value produces finer precision but increases computational cost.
-
-    Returns:
-        numpy.ndarray:
-            The best-aligned map.
-    """
-
-    steps = np.linspace(0, np.pi, n_steps)
-    best_err = np.inf
-    best_rotated = None
-
-    for step in steps:
-        candidate = np.mod(rot + step, np.pi)
-        diff = circ_diff(ref, candidate)
-        err = np.mean(diff ** 2)
-        if err < best_err:
-            best_err = err
-            best_rotated = candidate
-    #mark the corners as no valid
-    best_rotated[0, 0] = -2
-    best_rotated[0, 9] = -2
-    best_rotated[9, 0] = -2
-    best_rotated[9, 9] = -2
-    return best_rotated
-
-def circ_diff(a, b):
-    """
-    Computes the circular difference (with a period of π) between two spontaneous maps.
-
-    This function calculates the absolute difference between two angles (or angle arrays),
-    then adjusts it to ensure the difference is within the range [0, π/2], effectively
-    treating π as a full period.
-
-    Parameters:
-        a: float or array-like
-            The first angle or collection of angles in radians. Typically in [0, π).
-        b: float or array-like
-            The second angle or collection of angles in radians. Typically in [0, π).
-
-    Returns:
-        float or numpy.ndarray:
-            The circular difference between the inputs, within the range [0, π/2].
-            If inputs are arrays, the output is an array of the same shape.
-    """
-    diff = np.abs(a - b)
-    return np.minimum(diff, np.pi - diff)
-
-def rmse_angles(a, b):
-    """
-    Calculates the root mean square error (RMSE) for two angle arrays, accounting for circular difference.
-
-    This function uses `circ_diff` to compute the circular difference (period of π) between corresponding
-    angles in `a` and `b`, then calculates the square root of the mean of the squared differences.
-
-    Parameters:
-        a (array-like):
-            The first set of angles in radians.
-        b (array-like):
-            The second set of angles in radians, typically matching `a`.
-
-    Returns:
-        float:
-            The RMSE value representing the circular difference between `a` and `b`.
-    """
-    differences = circ_diff(a, b)
-    mse = np.mean(differences**2)
-    return np.sqrt(mse)
-
-def generate_rmse_distr(ref_map: np.ndarray, n_iter: int=2000, percentile: int=1):
-    """
-    Creates a distribution of RMSE values by randomly permuting a reference map and aligning each permutation
-    back to the original.
-
-    The function performs the following steps for each iteration:
-      1. Flattens `ref_map` and randomly permutes its elements, then reshapes it to the original shape.
-      2. Aligns the permuted map to the reference map using `find_ideal_rotation`.
-      3. Computes the RMSE between the reference map and the aligned permutation using `rmse_angles`.
-      4. Collects these RMSE values into a list.
-
-    After all iterations, the function returns the specified percentile value of the resulting RMSE distribution.
-    This process can be used to estimate a baseline or threshold for statistical analysis when comparing map
-    alignments.
-
-    Parameters:
-        ref_map (numpy.ndarray):
-            The reference spontaneous map, typically a 2D array.
-        n_iter (int, optional):
-            Number of random permutations to generate. Default is 2000.
-        percentile (float, optional):
-            Which percentile of the RMSE distribution to return. Default is 1 (1st percentile).
-
-    Returns:
-        float:
-            The selected percentile from the distribution of RMSE values obtained from random permutations.
-    """
-    rmse_dist = []
-    for i in range(n_iter):
-        permut_map = np.random.permutation(ref_map.flatten()).reshape(ref_map.shape)
-        permut_map = find_ideal_rotation(ref_map,permut_map)
-        rmse = rmse_angles(ref_map,permut_map)
-        rmse_dist.append(rmse)
-    return np.percentile(np.array(rmse_dist), percentile)
 
 def ggplot_rmse_vs_bin_size(df: pd.DataFrame):
     """
@@ -263,8 +137,8 @@ def ggplot_rmse(rmse_dic: dict, ref_obj: ArrayAnalysis):
             A ggplot object visualizing the sample-wise RMSE values with control threshold lines.
     """
     # Calculate control percentiles
-    percentile_5 = generate_rmse_distr(ref_obj.spontaneous_map, percentile=5)
-    percentile_1 = generate_rmse_distr(ref_obj.spontaneous_map, percentile=1)
+    percentile_5 = helper.generate_rmse_distr(ref_obj.spontaneous_map, percentile=5)
+    percentile_1 = helper.generate_rmse_distr(ref_obj.spontaneous_map, percentile=1)
     num_samples = len(rmse_dic)
 
     # Build a DataFrame for sample points
@@ -350,7 +224,7 @@ def ggplot_spontaneous_map(analysis_array, ref):
     # Align spontaneous maps
     ref_map = ref.spontaneous_map
     spont_map = analysis_array.spontaneous_map
-    spont_map = find_ideal_rotation(ref_map, spont_map, 10000)
+    spont_map = helper.find_ideal_rotation(ref_map, spont_map, 5000)
 
     # Build a DataFrame for valid points:
     # Use indices (iy, ix) as x and y, and convert orientation (in rad) to degrees.

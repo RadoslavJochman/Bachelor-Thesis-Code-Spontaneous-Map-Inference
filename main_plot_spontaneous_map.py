@@ -6,7 +6,7 @@ import os
 import argparse
 from array_analysis import load_object
 import plotting
-from helper import extract_paths
+from helper import extract_pickle_paths
 
 parser = argparse.ArgumentParser(description="Generate spontaneous map graphs using array objects and a reference object with specified principal components.")
 parser.add_argument("--array_obj_dir", default=None, type=str, help="Directory path containing the array object(s) to be processed.")
@@ -15,7 +15,7 @@ parser.add_argument("--PCs", default=None, type=str, help="Comma-separated princ
 parser.add_argument("--result_dir", default=None, type=str, help="Directory where the generated graph will be saved.")
 
 def main(args):
-    objects_paths = extract_paths(args.array_obj_dir)
+    objects_paths = extract_pickle_paths(args.array_obj_dir)
     PC1, PC2 = map(int, args.PCs.split(","))
     ref_obj = load_object(args.ref_path)
     ref_obj.compute_new_PC(PC1, PC2)

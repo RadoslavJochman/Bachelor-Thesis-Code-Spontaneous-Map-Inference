@@ -8,7 +8,7 @@ Calculating circular difference between two spontaneous maps
 Calculating RMSE of two spontaneous maps
     -rmse_angles()
 Generating control distribution of RMSE and calculating percentile
-    -generate_rmse_distr()
+    -generate_control_rmse_distr()
 subtracting mean across all channels from segments
     -segments_subtract_mean()
 loading human data from nnx file, and preprocess it
@@ -20,6 +20,7 @@ Calculate standard score for segments
 Authors: Karolína Korvasová, Matěj Voldřich
 Modifications by: Radoslav Jochman
 """
+import itertools
 from argparse import ArgumentError
 import neo
 import numpy as np
@@ -29,6 +30,13 @@ import preprocessing
 import pandas as pd
 from blackrock_utilities.brpylib             import NevFile, NsxFile, brpylib_ver
 from quantities import  Hz
+
+
+def join_dataframe(*args):
+    result = args[0]
+    for dataframe in args[1:]:
+        result = pd.concat([result, dataframe], ignore_index=True)
+    return result
 
 def find_ideal_rotation(ref: np.ndarray, rot: np.ndarray, n_steps: int=5000):
     """
@@ -113,7 +121,7 @@ def rmse_angles(a, b):
     mse = np.mean(differences**2)
     return np.sqrt(mse)
 
-def generate_rmse_distr(ref_map: np.ndarray, n_iter: int=2000, percentile: int=1):
+def generate_control_rmse_distr(ref_map: np.ndarray, n_iter: int=2000, percentile: int=1):
     """
     Creates a distribution of RMSE values by randomly permuting a reference map and aligning each permutation
     back to the original.
@@ -383,19 +391,106 @@ def get_bin_size(path):
     else: return None
 
 def calculate_rmse_distr_for_sample(paths: list[str],PCs: list[int], ref_obj_path, sample: str):
-    result = pd.DataFrame(columns=["sample","bin_size","PC_pair", "TH", "RMSE"])
+    """
+    Computes the RMSE between the spontaneous maps of sample objects and a fixed reference object
+    across multiple principal component (PC) pairs.
+
+    This function processes a collection of sample objects (provided as file paths) by comparing their
+    spontaneous maps with that of a reference object loaded from `ref_obj_path`. For every unique PC pair
+    (using combinations from the sorted list of PCs), the function:
+      - Updates the reference object's spontaneous map using the current PC pair by calling compute_new_PC.
+      - Iterates over each sample file in `paths`:
+          * Extracts the threshold (TH) and bin size information from the filename using helper functions
+            get_TH and get_bin_size.
+          * Loads the sample object and recalculates its spontaneous map with the same PC pair.
+          * Aligns the sample object's spontaneous map to the reference object's map using find_ideal_rotation.
+          * Computes the RMSE between the aligned sample map and the reference map via rmse_angles.
+          * Records the sample identifier, extracted bin size, formatted PC pair (e.g., "3,4"), threshold,
+            and the computed RMSE in a results list.
+
+    Finally, the function aggregates the results into a pandas DataFrame with the following columns:
+      - "sample": Identifier for the sample.
+      - "bin_size": The bin size extracted from the sample file name.
+      - "PC_pair": A string representation of the PC pair (formatted as "PC1,PC2").
+      - "TH": The threshold value extracted from the sample file name.
+      - "RMSE": The computed root mean square error between the reference and sample spontaneous maps.
+
+    Parameters:
+      paths (list[str]): List of file paths for the sample objects.
+      PCs (list[int]): List of principal component indices to evaluate; must contain at least two values.
+      ref_obj_path: File path to the reference object used to generate the baseline spontaneous map.
+      sample (str): Identifier for the sample, to be included in the result DataFrame.
+
+    Returns:
+      pd.DataFrame: A DataFrame summarizing the RMSE values for each PC pair and sample object, with columns:
+                    ["sample", "bin_size", "PC_pair", "TH", "RMSE"].
+    """
     ref_obj = load_object(ref_obj_path)
-    for PC1 in PCs:
-        for PC2 in PCs:
-            if PC1 < PC2:
-                ref_obj.compute_new_PC(PC1, PC2)
-                for path in paths:
-                    TH = get_TH(path)
-                    bin_size = get_bin_size(path)
-                    arr_obj = load_object(path)
-                    arr_obj.compute_new_PC(PC1, PC2)
-                    arr_map = find_ideal_rotation(ref_obj.spontaneous_map,arr_obj.spontaneous_map)
-                    rmse = rmse_angles(arr_map,ref_obj.spontaneous_map)
-                    result = pd.concat([pd.DataFrame([[sample,bin_size,f"{PC1},{PC2}",TH,rmse]], columns=result.columns),result],ignore_index=True)
+    PCs.sort()
+    results_list = []
+    for PC1,PC2 in itertools.combinations(PCs,2):
+        ref_obj.compute_new_PC(PC1, PC2)
+        for path in paths:
+            TH = get_TH(path)
+            bin_size = get_bin_size(path)
+            arr_obj = load_object(path)
+            arr_obj.compute_new_PC(PC1, PC2)
+            arr_map = find_ideal_rotation(ref_obj.spontaneous_map,arr_obj.spontaneous_map)
+            rmse = rmse_angles(arr_map,ref_obj.spontaneous_map)
+            results_list.append([sample,bin_size,f"{PC1},{PC2}",TH,rmse])
+    result = pd.DataFrame(results_list,columns=["sample","bin_size","PC_pair", "TH", "RMSE"])
     return result
 
+def calculate_rmse_distr_sample_and_ref_sample(paths: list[str],PCs: list[int], ref_sample_paths: list[str], sample: str):
+    """
+    Computes the RMSE between spontaneous maps for paired sample and reference objects across multiple principal component (PC) combinations.
+
+    The function processes corresponding file pairs from `paths` (sample objects) and `ref_sample_paths` (reference objects) after sorting them.
+    For each pair, it:
+      - Extracts the threshold (TH) and bin size from the filename using helper functions `get_TH` and `get_bin_size`.
+      - Verifies that the TH and bin size values in the sample and reference filenames match; if not, it raises an ArgumentError.
+      - Loads both the sample and reference objects using `load_object`.
+      - Iterates over every unique combination of two PCs (using itertools.combinations on the sorted `PCs` list), where for each PC pair (PC1, PC2):
+          * Recalculates the spontaneous maps for both objects by invoking `compute_new_PC(PC1, PC2)`.
+          * Aligns the sample object's spontaneous map to the reference object's spontaneous map with `find_ideal_rotation`.
+          * Computes the RMSE between the aligned sample map and the reference map via `rmse_angles`.
+          * Records a result row containing the sample identifier, bin size, formatted PC pair (as "PC1,PC2"), TH, and the RMSE value.
+
+    Parameters:
+      paths (list[str]): List of file paths for the sample objects.
+      PCs (list[int]): List of principal component indices to evaluate; at least two are required.
+      ref_sample_paths (list[str]): List of file paths for the corresponding reference objects.
+      sample (str): Identifier for the sample, which will be recorded in the results.
+
+    Returns:
+      pd.DataFrame: A DataFrame with columns ["sample", "bin_size", "PC_pair", "TH", "RMSE"], where each row corresponds to
+      the evaluation of a unique PC pair for a sample-reference object pair.
+
+    Raises:
+      ArgumentError: If the number of sample objects does not match the number of reference objects, or if the extracted TH or
+      bin size from a sample file does not match that of its corresponding reference file.
+    """
+    results_list =[]
+    paths.sort()
+    ref_sample_paths.sort()
+    PCs.sort()
+    if(len(ref_sample_paths)!=len(paths)):
+        raise ArgumentError(message="The number of reference objects has to be the same as number of processed objects.")
+    for ref_path, path in zip(ref_sample_paths, paths):
+        TH = get_TH(path)
+        bin_size = get_bin_size(path)
+        TH_ref = get_TH(ref_path)
+        bin_size_ref = get_bin_size(ref_path)
+        if(TH!=TH_ref or bin_size!=bin_size_ref):
+            raise ArgumentError(message="\"paths\" and \"ref_sample_paths\" has to contain pairs of objects named the as TH_fac_*_bin_size_*.pkl")
+        ref_obj = load_object(ref_path)
+        arr_obj = load_object(path)
+        for PC1, PC2 in itertools.combinations(PCs,2):
+            arr_obj.compute_new_PC(PC1, PC2)
+            ref_obj.compute_new_PC(PC1, PC2)
+            arr_map = find_ideal_rotation(ref_obj.spontaneous_map, arr_obj.spontaneous_map)
+            rmse = rmse_angles(arr_map, ref_obj.spontaneous_map)
+            results_list.append([sample, bin_size, f"{PC1},{PC2}", TH, rmse])
+    result = pd.DataFrame(results_list, columns=["sample", "bin_size", "PC_pair", "TH", "RMSE"])
+
+    return result

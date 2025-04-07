@@ -12,6 +12,9 @@ Author: Radoslav Jochman
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
+from plotnine.options import figure_size
+from plotnine.themes.themeable import legend_ticks
+from decimal import *
 from array_analysis import *
 from scipy.stats import linregress
 import helper
@@ -20,7 +23,8 @@ from plotnine import (ggplot, aes, geom_point, geom_smooth, labs, theme_minimal,
                       annotate, scale_shape_manual, geom_hline, scale_y_continuous, scale_x_continuous,
                       geom_text,coord_equal, scale_fill_gradientn, theme, element_rect,
                       element_blank, element_text, guides, guide_colorbar, geom_boxplot, facet_grid, geom_tile,
-                      facet_wrap,scale_fill_gradient, as_labeller)
+                      facet_wrap,scale_fill_gradient, as_labeller, geom_line, geom_ribbon, scale_color_gradientn,geom_col,
+                      geom_errorbar)
 
 def ggplot_rmse_vs_bin_size(df: pd.DataFrame):
     """
@@ -123,7 +127,7 @@ def ggplot_rmse(rmse_dic: dict, ref_obj: ArrayAnalysis):
     Generates a scatter plot of RMSE values for each sample with horizontal lines indicating control thresholds.
 
     The function first computes specific control percentiles (5th and 1st) for a reference map by generating a
-    distribution of RMSE values from randomized permutations (using `generate_rmse_distr`). These lines serve
+    distribution of RMSE values from randomized permutations (using `generate_control_rmse_distr`). These lines serve
     as baselines to compare individual sample RMSE values.
 
     Parameters:
@@ -138,8 +142,8 @@ def ggplot_rmse(rmse_dic: dict, ref_obj: ArrayAnalysis):
             A ggplot object visualizing the sample-wise RMSE values with control threshold lines.
     """
     # Calculate control percentiles
-    percentile_5 = helper.generate_rmse_distr(ref_obj.spontaneous_map, percentile=5)
-    percentile_1 = helper.generate_rmse_distr(ref_obj.spontaneous_map, percentile=1)
+    percentile_5 = helper.generate_control_rmse_distr(ref_obj.spontaneous_map, percentile=5)
+    percentile_1 = helper.generate_control_rmse_distr(ref_obj.spontaneous_map, percentile=1)
     num_samples = len(rmse_dic)
 
     # Build a DataFrame for sample points
@@ -239,11 +243,11 @@ def ggplot_spontaneous_map(analysis_array, ref):
     df_map = pd.DataFrame(data_list, columns=['x', 'y', 'orientation'])
 
     # Build a DataFrame for electrode labels
-    n_valid_electrodes = int(np.sum(spont_map > -2))
     elec_list = []
-    for i in range(n_valid_electrodes):
+    for i in range(96):
         ex, ey = helper.get_coords_from_electrode_human(i + 1)
-        elec_list.append((ex, ey, i + 1))
+        if spont_map[int(ey), int(ex)]>-0.5:
+            elec_list.append((ex, ey, i + 1))
     df_elec = pd.DataFrame(elec_list, columns=['x', 'y', 'label'])
 
     # Create a custom HSV gradient for orientation (0 to 180°)
@@ -322,20 +326,24 @@ def ggplot_heatmap_param(df_results):
     df_plot['TH'] = df_plot['TH'].astype(str)
 
     #Define a limited set of breaks for bin_size ticks
-    y_breaks = np.arange(np.min(df_plot["bin_size"]),np.max(df_plot["bin_size"]),0.15)
+    df_plot["bin_size"] = df_plot["bin_size"].astype(float)
+    y_breaks = np.arange(np.min(df_plot["bin_size"]),np.max(df_plot["bin_size"]),0.2)
 
     #Define labels for facets using TH values
     th_labels = {}
     for TH in df_plot['TH']:
         th_labels[TH] = f"Threshold {TH}"
 
+    cmap = plt.cm.get_cmap('inferno_r')
+    n_colors = 256
+    hsv_hex = [mcolors.to_hex(cmap(i/n_colors)) for i in range(n_colors)]
 
-    # 3) Build the heatmap
     p = (
         ggplot(df_plot, aes(x='PC_pair', y='bin_size', fill='RMSE'))
         + geom_tile()
         + facet_wrap('~TH', ncol=len(th_labels.keys()), labeller=as_labeller(th_labels))
-        + scale_fill_gradient(low='yellow', high='red')
+        #+ scale_fill_gradientn(colors=hsv_hex)
+        + scale_fill_gradient(high="red",low="yellow")
         + scale_y_continuous(breaks=y_breaks)  # fewer x ticks
         + labs(
             title="RMSE over Parameter Grid",
@@ -347,11 +355,237 @@ def ggplot_heatmap_param(df_results):
         + theme(
             panel_background=element_rect(fill='white'),
             plot_background=element_rect(fill='white'),
-            # 4) Make the figure wide enough to accommodate many facets
             figure_size=(30, 6),
-            # Rotate x-axis labels 90° to avoid overlap
             axis_text_x=element_text(angle=90, vjust=0.5, hjust=1)
         )
     )
     return p
 
+def ggplot_average_heatmap_param(df_results):
+    """
+    Expects df_results to have columns:
+      - bin_size (float)
+      - TH (e.g. -1, -2, -3)
+      - PC_pair (string like "0-1", "0-2", etc.)
+      - RMSE (float)
+
+    Creates a faceted heatmap:
+      - x-axis: bin_size (continuous)
+      - y-axis: threshold (discrete)
+      - fill: Mean RMSE
+      - one facet per PC_pair
+    """
+
+
+    df_plot = df_results.copy()
+    df_plot['TH'] = df_plot['TH'].astype(str)
+
+    #Define a limited set of breaks for bin_size ticks
+    df_results=df_results[np.isclose(df_results["bin_size"]*20 % 2, 0,atol=1e-8)]
+
+    y_breaks = np.arange(np.min(df_results["bin_size"]),np.max(df_results["bin_size"]+0.1),0.1)
+    df_summary = (
+        df_results.groupby(['bin_size', 'TH', 'PC_pair'], as_index=False)
+        .agg(mean_RMSE=('RMSE', 'mean'))
+    )
+    #Define labels for facets using TH values
+    th_labels = {}
+    for TH in df_plot['TH']:
+        th_labels[TH] = f"Threshold {TH}"
+
+    cmap = plt.cm.get_cmap('inferno_r')
+    n_colors = 256
+    hsv_hex = [mcolors.to_hex(cmap(i/n_colors)) for i in range(n_colors)]
+    p = (
+        ggplot(df_summary, aes(x='PC_pair', y='bin_size', fill='mean_RMSE'))
+        + geom_tile()
+        + facet_wrap('~TH', ncol=len(th_labels.keys()), labeller=as_labeller(th_labels))
+        #+ scale_fill_gradientn(colors=hsv_hex)
+        + scale_fill_gradient(high="red", low="yellow")
+        + scale_y_continuous(breaks=y_breaks)  # fewer x ticks
+        + labs(
+            title="RMSE over Parameter Grid",
+            x="PC pair",
+            y="Bin Size",
+            fill="Mean RMSE"
+        )
+        + theme_minimal()
+        + theme(
+            panel_background=element_rect(fill='white'),
+            plot_background=element_rect(fill='white'),
+            figure_size=(30, 6),
+            legend_title=element_text(rotation=90, va="baseline"),  #x=200,y=-400
+            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1,),
+            #legend_box_margin=30
+
+        )
+    )
+    return p
+
+def ggplot_lineband_param(df_results):
+    """
+    Expects a DataFrame with columns:
+      - bin_size: numeric (e.g., 0.15, 0.20, ..., 5.0)
+      - TH: numeric or categorical (e.g., -1, -2, -3)
+      - PC_pair: string (e.g., "0-1", "0-2", etc.)
+      - RMSE: numeric error value
+      - sample: identifier for each sample (so there can be multiple RMSE values per combination)
+
+    This function groups the data by bin_size, TH, and PC_pair, computes the mean RMSE
+    and the standard error (SE) across samples, then plots the mean RMSE with error bars.
+
+    Returns a plotnine object.
+    """
+
+    # Group by parameters and compute summary statistics
+    df_summary = (
+        df_results.groupby(['bin_size', 'TH', 'PC_pair'], as_index=False)
+        .agg(mean_RMSE=('RMSE', 'mean'),
+             sd_RMSE=('RMSE', 'std'),
+             n_samples=('RMSE', 'count'))
+    )
+    # Compute standard error
+    df_summary['se_RMSE'] = df_summary['sd_RMSE'] / df_summary['n_samples'] ** 0.5
+
+    # Define x-axis breaks (you can adjust as needed)
+    x_breaks = np.arange(np.min(df_summary["bin_size"]), np.max(df_summary["bin_size"]), 0.5)
+    #df_summary = df_summary[df_summary["PC_pair"].isin(["0,1", "0,2", "0,3","0,4","1,2","1,3","1,4","2,3",""])]
+
+    p = (ggplot(df_summary, aes(x='bin_size'))
+         # Ribbon for the uncertainty band:
+         + geom_ribbon(aes(ymin='mean_RMSE - sd_RMSE', ymax='mean_RMSE + sd_RMSE'),
+                       fill="blue", alpha=0.3)
+         # Line for the mean RMSE:
+         + geom_line(aes(y='mean_RMSE'), color='blue', size=0.8)
+         + facet_grid('TH ~ PC_pair',)
+         + scale_x_continuous(breaks=x_breaks)
+         + labs(title="Mean RMSE with Uncertainty Band",
+                x="Bin Size",
+                y="Mean RMSE")
+         + theme_minimal()
+         + theme(axis_text_x=element_text(angle=90, hjust=1, vjust=0.5),
+                 panel_background=element_text(fill='white'),
+                 plot_background=element_text(fill='white'),
+                 legend_position='none',
+                 figure_size=(24, 8)
+                 )
+    )
+    return p
+
+def ggplot_success_rate(df):
+    """
+    Expects a DataFrame with columns:
+      - spatial_distance: Numeric values for spatial distance (x-axis)
+      - functional_distance: Numeric values for functional distance (y-axis)
+      - success_rate: Numeric values (0 to 1) mapped to color
+
+    Returns a plotnine object with a scatter plot:
+      - x-axis: Spatial distance
+      - y-axis: Functional distance
+      - Color: Success rate using a viridis-like continuous color scale
+    """
+    # Create a viridis colormap using matplotlib and convert it to a list of hex colors.
+    n_colors = 256
+    cmap = plt.cm.get_cmap('viridis', n_colors)
+    viridis_hex = [mcolors.to_hex(cmap(i / n_colors)) for i in range(n_colors)]
+
+    p = (ggplot(df, aes(x='spatial_distance', y='functional_distance', color='success_rate'))
+         + geom_point(size=3)
+         + scale_color_gradientn(colors=viridis_hex, limits=(0, 1))
+         + labs(x="Spatial distance", y="Functional distance", color="Success rate")
+         + theme_minimal()
+         + theme(
+                panel_background=element_text(fill='white'),
+                plot_background=element_text(fill='white'),
+            )
+         )
+    return p
+
+def ggplot_mean_rmse_by_time(df: pd.DataFrame):
+    """
+    Plots the mean RMSE for each time_diff value.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame with columns "sample", "time_diff", and "RMSE".
+
+    Returns:
+        plotnine.ggplot: A plot showing mean RMSE versus time_diff.
+    """
+    # Group by time_diff and compute the mean RMSE
+    df_mean = df.groupby("time_diff", as_index=False)["RMSE"].mean()
+
+    # Create the plot with plotnine
+    p = (
+        ggplot(df_mean, aes(x='time_diff', y='RMSE')) +
+        geom_line(group=1) +  # Connects the points with a line
+        geom_point(size=3) +  # Adds points for each mean RMSE
+        labs(
+            title="Mean RMSE vs. Time Difference",
+            x="Time Difference",
+            y="Mean RMSE"
+        )
+        + theme(
+        panel_background=element_rect(fill='white'),
+        plot_background=element_rect(fill='white'),
+        figure_size=(30, 6),
+        legend_title=element_text(rotation=90, va="baseline"),  # x=200,y=-400
+        axis_text_x=element_text(angle=90, vjust=0.5, hjust=1, )
+        )
+    )
+
+    return p
+
+
+def ggplot_mean_rmse_bar(df: pd.DataFrame):
+    """
+    Plots the mean RMSE for each time_diff as a bar chart with error bars.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame with columns "sample", "time_diff", and "RMSE".
+
+    Returns:
+        plotnine.ggplot: A ggplot object representing the bar chart.
+    """
+    # Group by time_diff and calculate mean, standard deviation, and count
+    df_summary = df.groupby("time_diff", as_index=False).agg(
+        mean_RMSE=("RMSE", "mean"),
+        std_RMSE=("RMSE", "std"),
+        count=("RMSE", "count")
+    )
+    # Calculate standard error
+    df_summary['se'] = df_summary['std_RMSE'] / (df_summary['count'] ** 0.5)
+
+    # Create the bar chart with error bars
+    p = (ggplot(df_summary, aes(x="time_diff", y="mean_RMSE"))
+         + geom_col(fill="skyblue")  # Creates the bars
+         + geom_errorbar(aes(ymin="mean_RMSE - se", ymax="mean_RMSE + se"), width=0.2)
+         + labs(
+                title="Mean RMSE vs. Time Difference",
+                x="Time Difference",
+                y="Mean RMSE"
+            )
+         )
+
+    return p
+
+
+def ggplot_rmse_box(df: pd.DataFrame):
+    """
+    Creates a box plot of RMSE for each time_diff.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame with columns "sample", "time_diff", and "RMSE".
+
+    Returns:
+        plotnine.ggplot: A ggplot object representing the box plot.
+    """
+    p = (ggplot(df, aes(x="factor(time_diff)", y="RMSE"))
+         + geom_boxplot()
+         + labs(
+                title="RMSE Distribution by Time Difference",
+                x="Time Difference",
+                y="RMSE"
+            )
+         )
+
+    return p

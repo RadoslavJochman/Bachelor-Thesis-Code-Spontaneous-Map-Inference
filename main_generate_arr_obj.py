@@ -6,7 +6,7 @@ import yaml
 import argparse
 from analysis import compute_spontaneous_map, compute_frames
 from array_analysis import ArrayAnalysis, METHODS
-from helper import load_human_segments
+from helper import load_human_segments, process_LFP_to_nLFP
 
 
 
@@ -23,6 +23,7 @@ def main(args: argparse.Namespace):
         params = yaml.safe_load(f)
 
     segments = load_human_segments(args.data_dir, params)
+    segments = process_LFP_to_nLFP(segments, params)
 
     with open(args.analysis_params_dir) as f:
         analysis_params = yaml.safe_load(f)

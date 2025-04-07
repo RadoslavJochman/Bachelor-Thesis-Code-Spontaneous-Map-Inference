@@ -31,6 +31,65 @@ import pandas as pd
 from blackrock_utilities.brpylib             import NevFile, NsxFile, brpylib_ver
 from quantities import  Hz
 
+def distance_in_space(pattern1, pattern2, array_obj: ArrayAnalysis):
+    '''
+    Calculate pairwise spatial distances of electrodes in two electrodes sets (patterns).
+    :param pattern1: list of electrode numbers
+    :param pattern2: list of electrode numbers
+    :return: list of spatial distances
+    '''
+
+    resob =  array_obj
+
+    dists = []
+    for el1 in pattern1:
+        for el2 in pattern2:
+            chnix = convert_electrode_to_channel_human(el1) - 1
+            cx1, cy1 = resob.get_channel_position(int(chnix))
+            col1 = resob.spontaneous_values[int(chnix)]
+
+            chnix = convert_electrode_to_channel_human(el2) - 1
+            cx2, cy2 = resob.get_channel_position(int(chnix))
+            col2 = resob.spontaneous_values[int(chnix)]
+
+            if (col1 > -0.5) and (col2 > -0.5):
+                dists.append(np.linalg.norm(np.array([cx1*0.4, cy1*0.4])-np.array([cx2*0.4, cy2*0.4]), ord=2))
+
+    return dists
+
+def distance_of_patterns_in_map(pattern1, pattern2, array_obj: ArrayAnalysis):
+    '''
+    Calculate pairwise functional distances of electrodes in two electrodes sets (patterns).
+    :param pattern1: list of electrode numbers
+    :param pattern2: list of electrode numbers
+    :return: list of functional distances
+    '''
+
+
+    map_vals = array_obj.spontaneous_values
+
+    colors1 = []
+    for el in pattern1:
+
+        chnix = convert_electrode_to_channel_human(el)-1
+        colors1.append(map_vals[int(chnix)])
+
+    colors2 = []
+    for el in pattern2:
+
+        chnix = convert_electrode_to_channel_human(el)-1
+        colors2.append(map_vals[int(chnix)])
+
+    #check that colors are in radians
+    assert max(colors1+colors2)<4
+
+    dists = []
+    for i, col1 in enumerate(colors1):
+        for col2 in colors2:
+            if (col1>-0.5) and (col2>-0.5):
+                dists.append(np.min((np.abs(col1 - col2), 3.14 - np.abs(col1 - col2))))
+
+    return dists
 
 def join_dataframe(*args):
     result = args[0]
@@ -59,7 +118,7 @@ def find_ideal_rotation(ref: np.ndarray, rot: np.ndarray, n_steps: int=5000):
         numpy.ndarray:
             The best-aligned map.
     """
-
+    deleted_mask = rot==-2
     steps = np.linspace(0, np.pi, n_steps)
     best_err = np.inf
     best_rotated = None
@@ -71,11 +130,9 @@ def find_ideal_rotation(ref: np.ndarray, rot: np.ndarray, n_steps: int=5000):
         if err < best_err:
             best_err = err
             best_rotated = candidate
-    #mark the corners as no valid
-    best_rotated[0, 0] = -2
-    best_rotated[0, 9] = -2
-    best_rotated[9, 0] = -2
-    best_rotated[9, 9] = -2
+    #mark deleted channels as not valid
+
+    best_rotated[deleted_mask] = -2
     return best_rotated
 
 def circ_diff(a, b):
@@ -117,8 +174,14 @@ def rmse_angles(a, b):
         float:
             The RMSE value representing the circular difference between `a` and `b`.
     """
+    a = a.astype(np.float64)
+    b = b.astype(np.float64)
+
+    deleted_mask = (a < 0) | (b < 0)
+    a[deleted_mask] = np.nan
+    b[deleted_mask] = np.nan
     differences = circ_diff(a, b)
-    mse = np.mean(differences**2)
+    mse = np.nanmean(differences**2, where=differences!=np.nan)
     return np.sqrt(mse)
 
 def generate_control_rmse_distr(ref_map: np.ndarray, n_iter: int=2000, percentile: int=1):
@@ -197,7 +260,7 @@ def load_human_segments(data_location: str, params: dict):
     """
 
     #Generate paths from directory or text file
-    paths = extract_pickle_paths(data_location)
+    paths = extract_paths(data_location)
     # Read layout, get number of channels
     layout = pd.read_csv(params["layout_path"])
     n_channels = np.sum(~np.isnan(layout["chn"]))
@@ -230,6 +293,9 @@ def load_human_segments(data_location: str, params: dict):
                                range(n_channels)]
             segments.append(s)
 
+    return segments
+
+def process_LFP_to_nLFP(segments: list, params: dict):
     if 'z_score' in params.keys() and params['z_score']:
         segments = zscore_segments(segments)
 
@@ -241,15 +307,18 @@ def load_human_segments(data_location: str, params: dict):
     else:
         segments = [preprocessing.nLFP(segment, params['threshold_factor'], params['filter'],tag="human").segments[0]
                     for segment in segments]
-
     return segments
-
 def get_coords_from_electrode_human(electrode_number):
 
-    electrodes_channels_coords_map = pd.read_pickle('/home/rado/School/bachelor/prosthesis/metadata/electrode_mapping.pickle')
+    electrodes_channels_coords_map = pd.read_pickle('metadata/electrode_mapping.pickle')
     x = electrodes_channels_coords_map[electrodes_channels_coords_map['New Electrodes']==electrode_number].x.values[0]
     y = electrodes_channels_coords_map[electrodes_channels_coords_map['New Electrodes']==electrode_number].y.values[0]
     return x,y
+
+def convert_electrode_to_channel_human(electrode_number):
+
+    electrodes_channels_coords_map = pd.read_pickle('metadata/electrode_mapping.pickle')
+    return electrodes_channels_coords_map[electrodes_channels_coords_map['New Electrodes']==electrode_number].Channels.values[0]
 
 def zscore_segments(segments):
     from scipy.stats import zscore
@@ -259,7 +328,7 @@ def zscore_segments(segments):
                                                     t_stop=ansigs.t_stop, sampling_rate=ansigs.sampling_rate)
     return segments
 
-def extract_pickle_paths(data_location: str):
+def extract_paths(data_location: str, extension: str=None):
     """
     Extracts file paths based on the given data location.
 
@@ -282,7 +351,7 @@ def extract_pickle_paths(data_location: str):
     if os.path.isfile(data_location):
         with open(data_location) as f:
             paths = f.readlines()
-            paths = [p.strip() for p in paths if ".pkl" in p]
+            paths = [p.strip() for p in paths if extension is None or extension in p]
     else:
         paths = os.listdir(data_location)
         paths = [f'{data_location}/{name}' for name in paths if ".pkl" in name]
@@ -490,7 +559,7 @@ def calculate_rmse_distr_sample_and_ref_sample(paths: list[str],PCs: list[int], 
             ref_obj.compute_new_PC(PC1, PC2)
             arr_map = find_ideal_rotation(ref_obj.spontaneous_map, arr_obj.spontaneous_map)
             rmse = rmse_angles(arr_map, ref_obj.spontaneous_map)
-            results_list.append([sample, bin_size, f"{PC1},{PC2}", TH, rmse])
+            results_list.append([sample, bin_size, f"{PC1+1},{PC2+1}", TH, rmse])
     result = pd.DataFrame(results_list, columns=["sample", "bin_size", "PC_pair", "TH", "RMSE"])
 
     return result

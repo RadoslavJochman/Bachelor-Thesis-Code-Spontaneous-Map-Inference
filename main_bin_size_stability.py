@@ -2,9 +2,11 @@
 Author: Radoslav Jochman
 """
 import pandas as pd
+
+import helper
 from array_analysis import ArrayAnalysis, METHODS
 import yaml
-from helper import load_human_segments
+from helper import load_human_segments, process_LFP_to_nLFP
 from analysis import compute_spontaneous_map
 import numpy as np
 import argparse
@@ -17,6 +19,7 @@ parser.add_argument("--result_dir", default=None, type=str,help="Directory where
 parser.add_argument("--start_size", type=float, default=0.15, help="Starting value of the bin size range to explore (in seconds).")
 parser.add_argument("--end_size", type=float, default=5.0, help="Ending value of the bin size range to explore (in seconds).")
 parser.add_argument("--num_steps", type=int, default=200, help="Number of steps to divide the bin size range.")
+parser.add_argument("--good_channels",type=str, default=None, help="Path to CSV file with channel indices used as good channels.")
 
 def main(args):
     bin_sizes = np.round(np.linspace(args.start_size, args.end_size, args.num_steps), 2)
@@ -28,14 +31,19 @@ def main(args):
         params_analysis = yaml.safe_load(f)
 
     layout = pd.read_csv(params['layout_path'])
-
+    n_channels = np.sum(~np.isnan(layout["chn"]))
+    bad_channels = []
+    if args.good_channels!=None:
+        good_channels = pd.read_csv(args.good_channels)["channel_ids"]
+        bad_channels = [channel for channel in range(n_channels) if channel not in good_channels]
     #go through all analysed bin sizes and create ArrayAnalysis object
+    segments = load_human_segments(args.data_dir, params)
+    segments = process_LFP_to_nLFP(segments,params)
     for bin_size in bin_sizes:
         params_analysis["event_binsize"] = bin_size
 
-        segments = load_human_segments(args.data_dir, params)
-
         arr_obj = ArrayAnalysis("4",METHODS.nLFP,segments,layout,params_analysis)
+        arr_obj.deleted_channels=bad_channels
         compute_spontaneous_map(arr_obj)
         arr_obj.save_lightweight(f'{args.result_dir}/TH_fac_{th_factor}_bin_size_{bin_size}.pkl')
         del arr_obj

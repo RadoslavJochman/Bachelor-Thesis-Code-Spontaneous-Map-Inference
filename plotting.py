@@ -12,9 +12,8 @@ Author: Radoslav Jochman
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
-from plotnine.options import figure_size
-from plotnine.themes.themeable import legend_ticks
-from decimal import *
+from plotnine.themes.themeable import axis_line_x
+
 from array_analysis import *
 from scipy.stats import linregress
 import helper
@@ -24,7 +23,7 @@ from plotnine import (ggplot, aes, geom_point, geom_smooth, labs, theme_minimal,
                       geom_text,coord_equal, scale_fill_gradientn, theme, element_rect,
                       element_blank, element_text, guides, guide_colorbar, geom_boxplot, facet_grid, geom_tile,
                       facet_wrap,scale_fill_gradient, as_labeller, geom_line, geom_ribbon, scale_color_gradientn,geom_col,
-                      geom_errorbar)
+                      geom_errorbar,geom_raster,element_line)
 
 def ggplot_rmse_vs_bin_size(df: pd.DataFrame):
     """
@@ -342,8 +341,8 @@ def ggplot_heatmap_param(df_results):
         ggplot(df_plot, aes(x='PC_pair', y='bin_size', fill='RMSE'))
         + geom_tile()
         + facet_wrap('~TH', ncol=len(th_labels.keys()), labeller=as_labeller(th_labels))
-        #+ scale_fill_gradientn(colors=hsv_hex)
-        + scale_fill_gradient(high="red",low="yellow")
+        + scale_fill_gradientn(colors=hsv_hex)
+        #+ scale_fill_gradient(high="red",low="yellow")
         + scale_y_continuous(breaks=y_breaks)  # fewer x ticks
         + labs(
             title="RMSE over Parameter Grid",
@@ -361,7 +360,7 @@ def ggplot_heatmap_param(df_results):
     )
     return p
 
-def ggplot_average_heatmap_param(df_results):
+def ggplot_average_heatmap_param(df_results, title: str):
     """
     Expects df_results to have columns:
       - bin_size (float)
@@ -388,6 +387,7 @@ def ggplot_average_heatmap_param(df_results):
         df_results.groupby(['bin_size', 'TH', 'PC_pair'], as_index=False)
         .agg(mean_RMSE=('RMSE', 'mean'))
     )
+    print(f"Average max {df_summary['mean_RMSE'].max()}\n min {df_summary['mean_RMSE'].min()}")
     #Define labels for facets using TH values
     th_labels = {}
     for TH in df_plot['TH']:
@@ -398,25 +398,103 @@ def ggplot_average_heatmap_param(df_results):
     hsv_hex = [mcolors.to_hex(cmap(i/n_colors)) for i in range(n_colors)]
     p = (
         ggplot(df_summary, aes(x='PC_pair', y='bin_size', fill='mean_RMSE'))
-        + geom_tile()
+        + geom_raster()
         + facet_wrap('~TH', ncol=len(th_labels.keys()), labeller=as_labeller(th_labels))
-        #+ scale_fill_gradientn(colors=hsv_hex)
-        + scale_fill_gradient(high="red", low="yellow")
+        + scale_fill_gradientn(colors=hsv_hex,
+                               limits=(0.1, 0.9),
+                               breaks=[0.3, 0.5, 0.7])
+        #+ scale_fill_gradient(high="red", low="yellow")
         + scale_y_continuous(breaks=y_breaks)  # fewer x ticks
         + labs(
-            title="RMSE over Parameter Grid",
+            title=title,
             x="PC pair",
-            y="Bin Size",
-            fill="Mean RMSE"
+            y="Bin Size [s]",
+            fill="Mean RMSE [rad]"
         )
         + theme_minimal()
         + theme(
+            panel_border=element_blank(),
             panel_background=element_rect(fill='white'),
             plot_background=element_rect(fill='white'),
             figure_size=(30, 6),
-            legend_title=element_text(rotation=90, va="baseline"),  #x=200,y=-400
-            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1,),
-            #legend_box_margin=30
+            legend_title=element_text(rotation=90, va="center_baseline", ha="center", x=-9, size=15),  #x=200,y=-400
+            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1),
+            axis_title_x = element_text(size=15),
+            axis_title_y = element_text(size=15),
+            strip_text_x=element_text(size=15)
+
+        )
+    )
+    return p
+
+def ggplot_std_heatmap_param(df_results, title: str):
+    """
+    Expects df_results to have columns:
+      - bin_size (float)
+      - TH (e.g. -1, -2, -3)
+      - PC_pair (string like "0-1", "0-2", etc.)
+      - RMSE (float)
+
+    Creates a faceted heatmap:
+      - x-axis: bin_size (continuous)
+      - y-axis: threshold (discrete)
+      - fill: Mean RMSE
+      - one facet per PC_pair
+    """
+
+
+    df_plot = df_results.copy()
+    df_plot['TH'] = df_plot['TH'].astype(str)
+
+    #Define a limited set of breaks for bin_size ticks
+    df_results=df_results[np.isclose(df_results["bin_size"]*20 % 2, 0,atol=1e-8)]
+
+    y_breaks = np.arange(np.min(df_results["bin_size"]),np.max(df_results["bin_size"]+0.1),0.1)
+
+    df_summary = df_results.groupby(['bin_size', 'TH', 'PC_pair'], as_index=False).agg(
+        mean_RMSE=("RMSE", "mean"),
+        std_RMSE=("RMSE", "std"),
+        count=("RMSE", "count")
+    )
+
+    # Calculate standard error
+    df_summary['se'] = df_summary['std_RMSE'] / (df_summary['count'] ** 0.5)
+    print(f"Standard error max {df_summary['se'].max()}\n min {df_summary['se'].min()}")
+    #Define labels for facets using TH values
+    th_labels = {}
+    for TH in df_plot['TH']:
+        th_labels[TH] = f"Threshold {TH}"
+
+    cmap = plt.cm.get_cmap('inferno_r')
+    n_colors = 256
+    hsv_hex = [mcolors.to_hex(cmap(i/n_colors)) for i in range(n_colors)]
+    p = (
+        ggplot(df_summary, aes(x='PC_pair', y='bin_size', fill='se'))
+        + geom_raster()
+        + facet_wrap('~TH', ncol=len(th_labels.keys()), labeller=as_labeller(th_labels))
+        + scale_fill_gradientn(colors=hsv_hex,
+                               limits=(0, 0.1),
+                               breaks=[0.02, 0.04, 0.06, 0.08])
+        #+ scale_fill_gradient(high="red", low="yellow")
+        + scale_y_continuous(breaks=y_breaks)  # fewer x ticks
+        + labs(
+            title=title,
+            x="PC pair",
+            y="Bin Size [s]",
+            fill="Standard error of RMSE [rad]",
+
+        )
+        + theme_minimal()
+        + theme(
+            panel_border=element_blank(),
+            panel_background=element_rect(fill='white'),
+            plot_background=element_rect(fill='white'),
+            figure_size=(30, 6),
+            legend_title=element_text(rotation=90, va="center_baseline", ha="center", x=-9, size=15),  #,y=-400
+            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1),
+            axis_title_x = element_text(size=15),
+            axis_title_y = element_text(size=15),
+            strip_text_x=element_text(size=15)
 
         )
     )
@@ -535,7 +613,6 @@ def ggplot_mean_rmse_by_time(df: pd.DataFrame):
 
     return p
 
-
 def ggplot_mean_rmse_bar(df: pd.DataFrame):
     """
     Plots the mean RMSE for each time_diff as a bar chart with error bars.
@@ -560,14 +637,25 @@ def ggplot_mean_rmse_bar(df: pd.DataFrame):
          + geom_col(fill="skyblue")  # Creates the bars
          + geom_errorbar(aes(ymin="mean_RMSE - se", ymax="mean_RMSE + se"), width=0.2)
          + labs(
-                title="Mean RMSE vs. Time Difference",
-                x="Time Difference",
-                y="Mean RMSE"
+                title="",
+                x="Temporal distance [min]",
+                y="Mean RMSE [rad]"
+            )
+         + scale_y_continuous(limits=(0,0.07),breaks=[0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07])
+         + theme(
+                panel_background=element_rect(fill='white'),
+                plot_background=element_rect(fill='white'),
+                panel_border=element_rect(color='black', fill=None, size=1),
+                figure_size=(30, 6),
+                axis_text_x=element_text(size=12),
+                axis_text_y=element_text(size=12),
+                axis_title_x=element_text(size=15),
+                axis_title_y=element_text(size=15),
+                strip_text_x=element_text(size=15)
             )
          )
 
     return p
-
 
 def ggplot_rmse_box(df: pd.DataFrame):
     """
@@ -582,9 +670,22 @@ def ggplot_rmse_box(df: pd.DataFrame):
     p = (ggplot(df, aes(x="factor(time_diff)", y="RMSE"))
          + geom_boxplot()
          + labs(
-                title="RMSE Distribution by Time Difference",
-                x="Time Difference",
-                y="RMSE"
+                title="",
+                x="Temporal distance [min]",
+                y="RMSE [rad]"
+            )
+         + scale_y_continuous(limits=(0,1.5),breaks=[0.3, 0.6, 0.9, 1.2, 1.5])
+         + theme(
+                panel_background=element_rect(fill='white'),
+                plot_background=element_rect(fill='white'),
+                panel_border=element_rect(color='black', fill=None, size=1),
+                figure_size=(30, 6),
+                axis_text_x=element_text(size=8),
+                axis_text_y=element_text(size=8),
+                axis_title_x=element_text(size=15),
+                axis_title_y=element_text(size=15),
+                strip_text_x=element_text(size=15)
+
             )
          )
 

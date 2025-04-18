@@ -2,7 +2,8 @@
 Plotting
 This script contains functions for
 Plotting graph of how RMSE depends on bin size with specific threshold factor and PCs
-    -ggplot_rmse_vs_bin_size()
+    -ggplot_average_heatmap_param()
+    -ggplot_std_heatmap_param()
 Plotting RMSE for different samples
     -ggplot_rmse()
 Plotting spontaneous maps

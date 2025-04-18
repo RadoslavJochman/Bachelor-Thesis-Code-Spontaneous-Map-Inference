@@ -17,15 +17,16 @@ parser.add_argument("--result_dir", default=None, type=str, help="Directory wher
 def main(args):
     objects_paths = extract_paths(args.array_obj_dir)
     PC1, PC2 = map(int, args.PCs.split(","))
+    ref_sample = args.ref_path.split("/")[-2]
     ref_obj = load_object(args.ref_path)
     ref_obj.compute_new_PC(PC1, PC2)
     for path in objects_paths:
         file_name = os.path.splitext(os.path.basename(path))[0]
-        sample = path.split("/")[-2]
+        sample = path.split("/")[-2][7:]
         arr_obj = load_object(path)
         arr_obj.compute_new_PC(PC1, PC2)
         p = plotting.ggplot_spontaneous_map(arr_obj, ref_obj)
-        result_path = f"{args.result_dir}/spont_{sample}_{file_name}.png"
+        result_path = f"{args.result_dir}/ref_{ref_sample}_{sample}_spont_{file_name}.png"
         p.save(filename=result_path, width=8, height=8, dpi=300)
 
 if __name__ == '__main__':

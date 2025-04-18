@@ -1,24 +1,43 @@
 """
 Helper
-This script contains functions for
+This script contains functions for:
+Calculating spatial distance of electrodes:
+    -distance_in_space()
+Calculating functional distance between electrodes
+    -distance_of_patterns_in_map()
+Joining pandas dataframes
+    -join_dataframes()
 Aligning spontaneous map to a reference map
     -find_ideal_rotation()
 Calculating circular difference between two spontaneous maps
     -circ_diff()
 Calculating RMSE of two spontaneous maps
     -rmse_angles()
-Generating control distribution of RMSE and calculating percentile
-    -generate_control_rmse_distr()
-subtracting mean across all channels from segments
+Subtracting mean across all channels from segments
     -segments_subtract_mean()
-loading human data from nnx file, and preprocess it
+Loading human data from nnx file
     -load_human_segments()
-getting coords from electrode index
+Preprocessing LFP signalt to nLFP
+    -process_LFP_to_nLFP()
+Getting coords from electrode index
     -get_coords_from_electrode_human()
+Getting channel number from coords
+    -convert_electrode_to_channel_human()
+Extracting paths from directory
+    -extract_paths()
+Splitting segments into smaller parts:
+    -split_segment()
+Filtering paths:
+    -filter_paths_by_TH()
+    -filter_paths_by_bin_size()
+Getting parameters from path:
+    -get_TH()
+    -get_bin_size()
 Calculate standard score for segments
     -zscore_segments()
-Authors: Karolína Korvasová, Matěj Voldřich
-Modifications by: Radoslav Jochman
+Calculating RMSE between two samples using all possible parameters
+    -calculate_rmse_distr_sample_and_ref_sample()
+Authors: Karolína Korvasová, Matěj Voldřich, Radoslav Jochman
 """
 import itertools
 from argparse import ArgumentError
@@ -184,41 +203,6 @@ def rmse_angles(a, b):
     mse = np.nanmean(differences**2, where=differences!=np.nan)
     return np.sqrt(mse)
 
-def generate_control_rmse_distr(ref_map: np.ndarray, n_iter: int=2000, percentile: int=1):
-    """
-    Creates a distribution of RMSE values by randomly permuting a reference map and aligning each permutation
-    back to the original.
-
-    The function performs the following steps for each iteration:
-      1. Flattens `ref_map` and randomly permutes its elements, then reshapes it to the original shape.
-      2. Aligns the permuted map to the reference map using `find_ideal_rotation`.
-      3. Computes the RMSE between the reference map and the aligned permutation using `rmse_angles`.
-      4. Collects these RMSE values into a list.
-
-    After all iterations, the function returns the specified percentile value of the resulting RMSE distribution.
-    This process can be used to estimate a baseline or threshold for statistical analysis when comparing map
-    alignments.
-
-    Parameters:
-        ref_map (numpy.ndarray):
-            The reference spontaneous map, typically a 2D array.
-        n_iter (int, optional):
-            Number of random permutations to generate. Default is 2000.
-        percentile (float, optional):
-            Which percentile of the RMSE distribution to return. Default is 1 (1st percentile).
-
-    Returns:
-        float:
-            The selected percentile from the distribution of RMSE values obtained from random permutations.
-    """
-    rmse_dist = []
-    for i in range(n_iter):
-        permut_map = np.random.permutation(ref_map.flatten()).reshape(ref_map.shape)
-        permut_map = find_ideal_rotation(ref_map,permut_map)
-        rmse = rmse_angles(ref_map,permut_map)
-        rmse_dist.append(rmse)
-    return np.percentile(np.array(rmse_dist), percentile)
-
 def segments_subtract_mean(segments):
     """
     Applies Common Average Referencing (CAR) across channels for each segment at each time point.
@@ -308,6 +292,7 @@ def process_LFP_to_nLFP(segments: list, params: dict):
         segments = [preprocessing.nLFP(segment, params['threshold_factor'], params['filter'],tag="human").segments[0]
                     for segment in segments]
     return segments
+
 def get_coords_from_electrode_human(electrode_number):
 
     electrodes_channels_coords_map = pd.read_pickle('metadata/electrode_mapping.pickle')
@@ -551,7 +536,7 @@ def calculate_rmse_distr_sample_and_ref_sample(paths: list[str],PCs: list[int], 
         TH_ref = get_TH(ref_path)
         bin_size_ref = get_bin_size(ref_path)
         if(TH!=TH_ref or bin_size!=bin_size_ref):
-            raise ArgumentError(message="\"paths\" and \"ref_sample_paths\" has to contain pairs of objects named the as TH_fac_*_bin_size_*.pkl")
+            raise ArgumentError(message="\"paths\" and \"ref_sample_paths\" has to contain pairs of objects named as TH_fac_*_bin_size_*.pkl")
         ref_obj = load_object(ref_path)
         arr_obj = load_object(path)
         for PC1, PC2 in itertools.combinations(PCs,2):

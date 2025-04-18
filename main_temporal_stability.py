@@ -29,7 +29,6 @@ def main(args: argparse.Namespace):
     segments = load_human_segments(args.data_location,params)
     for seg in segments:
         for i, split_seg in enumerate(split_segment(seg, args.segment_size)):
-            print(i)
             split_seg = process_LFP_to_nLFP([split_seg],params)
             arr_obj = ArrayAnalysis("4",METHODS.nLFP,split_seg,layout,analysis_params)
             arr_obj.deleted_channels=bad_channels

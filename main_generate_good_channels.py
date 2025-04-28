@@ -1,3 +1,6 @@
+"""
+Author: Radoslav Jochman
+"""
 import argparse
 import neo
 import pandas as pd

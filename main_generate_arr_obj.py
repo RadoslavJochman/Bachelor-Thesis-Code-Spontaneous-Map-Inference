@@ -1,5 +1,38 @@
 """
+Script: main_compute_new_PC.py
+
 Author: Radoslav Jochman
+
+Description:
+    This script processes neural data segments to compute and save spontaneous activity
+    maps projected onto specified principal component dimensions.
+
+    It loads data and analysis parameters, converts LFP segments to nLFP format,
+    initializes an ArrayAnalysis object, computes spontaneous maps, projects the data
+    onto selected PCA components, and saves the result as a pickled object.
+
+Usage:
+    python main_compute_new_PC.py
+        --analysis_params_dir path/to/analysis_params.yaml
+        --params_dir path/to/data_params.yaml
+        --data_dir path/to/data_or_list.txt
+        --PCs "0,1"
+        --result_dir path/to/save/results
+        --result_name output_filename.pkl
+
+Arguments:
+    --analysis_params_dir : str
+        Path to YAML file containing parameters for the analysis.
+    --params_dir : str
+        Path to YAML file containing parameters for data loading and preprocessing.
+    --data_dir : str
+        Directory or file listing neural data segments to process.
+    --PCs : str
+        Comma-separated indices of principal components to use (e.g., "0,1").
+    --result_dir : str
+        Directory where the output pickled object will be saved.
+    --result_name : str
+        Filename for the output pickle.
 """
 import pandas as pd
 import yaml

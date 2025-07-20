@@ -136,6 +136,38 @@ class ArrayAnalysis:
         self._spontaneous_values = values
 
     def compute_new_PC(self,PC1,PC2):
+        """
+        Computes a new spontaneous activity map based on the projection of PCA components.
+
+        This method selects two principal components from the previously computed PCA (`_points_PCA`)
+        and projects the data onto the 2D plane defined by these components. Each channel is assigned a
+        "label" corresponding to the angular position of its PCA-projected point in the 2D space. These
+        labels are stored as `spontaneous_values` and also transformed into a 2D spatial map via
+        `values_to_map`.
+
+        Bad or deleted channels are excluded from the angle computation and marked with a default value (-2.).
+
+        Parameters
+        ----------
+        PC1 : int
+            Index of the first principal component to project onto.
+        PC2 : int
+            Index of the second principal component to project onto.
+
+        Sets
+        ----
+        self.params["target_PCA_dims"] : list
+            Stores the selected PCA component indices.
+        self._spontaneous_values : np.ndarray
+            Array of angular-based labels for each channel.
+        self._spontaneous_map : np.ndarray
+            2D map of `spontaneous_values` projected into array space.
+
+        Notes
+        -----
+        - The angles are normalized by subtracting the minimum and scaled to fit in the [0, π) range.
+        - Channels in `deleted_channels` are excluded and set to -2. in the final label map.
+        """
         good_value_inds = [i for i in range(self.n_channels) if i + 1 not in self.deleted_channels]
         points_2d = self._points_PCA[:, [PC1, PC2]]
         self.params["target_PCA_dims"] = [PC1, PC2]

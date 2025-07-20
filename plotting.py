@@ -13,7 +13,7 @@ Author: Radoslav Jochman
 import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
-from plotnine.themes.themeable import axis_line_x
+from plotnine.themes.themeable import axis_line_x, legend_text
 
 from array_analysis import *
 from scipy.stats import linregress
@@ -205,7 +205,7 @@ def ggplot_rmse(rmse_dic: dict, ref_obj: ArrayAnalysis):
 
     return p
 
-def ggplot_spontaneous_map(analysis_array, ref):
+def ggplot_spontaneous_map_human(analysis_array, ref):
     """
     Generates a spontaneous map plot using plotnine, mimicking the style of ggplot2 in Python.
 
@@ -383,7 +383,7 @@ def ggplot_average_heatmap_param(df_results, title: str):
     #Define a limited set of breaks for bin_size ticks
     df_results=df_results[np.isclose(df_results["bin_size"]*20 % 2, 0,atol=1e-8)]
 
-    y_breaks = np.arange(np.min(df_results["bin_size"]),np.max(df_results["bin_size"]+0.1),0.1)
+    y_breaks = np.arange(np.min(df_results["bin_size"])+0.1,np.max(df_results["bin_size"]+0.2),0.2)
     df_summary = (
         df_results.groupby(['bin_size', 'TH', 'PC_pair'], as_index=False)
         .agg(mean_RMSE=('RMSE', 'mean'))
@@ -418,11 +418,13 @@ def ggplot_average_heatmap_param(df_results, title: str):
             panel_background=element_rect(fill='white'),
             plot_background=element_rect(fill='white'),
             figure_size=(30, 6),
-            legend_title=element_text(rotation=90, va="center_baseline", ha="center", x=-9, size=15),  #x=200,y=-400
-            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1),
-            axis_title_x = element_text(size=15),
-            axis_title_y = element_text(size=15),
-            strip_text_x=element_text(size=15)
+            legend_title=element_text(rotation=90, va="center_baseline", ha="center", x=-10, size=15),  #x=200,y=-400
+            legend_text=element_text(size=11),
+            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1, size=11),
+            axis_text_y=element_text(size=11),
+            axis_title_x = element_text(size=20),
+            axis_title_y = element_text(size=20),
+            strip_text_x=element_text(size=20)
 
         )
     )
@@ -450,7 +452,7 @@ def ggplot_std_heatmap_param(df_results, title: str):
     #Define a limited set of breaks for bin_size ticks
     df_results=df_results[np.isclose(df_results["bin_size"]*20 % 2, 0,atol=1e-8)]
 
-    y_breaks = np.arange(np.min(df_results["bin_size"]),np.max(df_results["bin_size"]+0.1),0.1)
+    y_breaks = np.arange(np.min(df_results["bin_size"])+0.1,np.max(df_results["bin_size"]+0.2),0.2)
 
     df_summary = df_results.groupby(['bin_size', 'TH', 'PC_pair'], as_index=False).agg(
         mean_RMSE=("RMSE", "mean"),
@@ -491,11 +493,13 @@ def ggplot_std_heatmap_param(df_results, title: str):
             panel_background=element_rect(fill='white'),
             plot_background=element_rect(fill='white'),
             figure_size=(30, 6),
-            legend_title=element_text(rotation=90, va="center_baseline", ha="center", x=-9, size=15),  #,y=-400
-            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1),
-            axis_title_x = element_text(size=15),
-            axis_title_y = element_text(size=15),
-            strip_text_x=element_text(size=15)
+            legend_title=element_text(rotation=90, va="center_baseline", ha="center", x=-13, size=15),  #,y=-400
+            legend_text=element_text(size=11),
+            axis_text_x=element_text(angle=90, vjust=0.5, hjust=1,size=11),
+            axis_text_y=element_text(size=11),
+            axis_title_x = element_text(size=20),
+            axis_title_y = element_text(size=20),
+            strip_text_x=element_text(size=20)
 
         )
     )
@@ -648,11 +652,11 @@ def ggplot_mean_rmse_bar(df: pd.DataFrame):
                 plot_background=element_rect(fill='white'),
                 panel_border=element_rect(color='black', fill=None, size=1),
                 figure_size=(30, 6),
-                axis_text_x=element_text(size=12),
-                axis_text_y=element_text(size=12),
-                axis_title_x=element_text(size=15),
-                axis_title_y=element_text(size=15),
-                strip_text_x=element_text(size=15)
+                axis_text_x=element_text(size=25),
+                axis_text_y=element_text(size=25),
+                axis_title_x=element_text(size=25),
+                axis_title_y=element_text(size=25),
+                strip_text_x=element_text(size=25)
             )
          )
 

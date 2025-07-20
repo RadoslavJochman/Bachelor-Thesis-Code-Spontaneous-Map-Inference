@@ -1,5 +1,41 @@
 """
+Script: main_generate_spontaneous_map.py
+
 Author: Radoslav Jochman
+
+Description:
+    This script performs analysis on neural data to generate spontaneous activity maps
+    for a range of bin sizes. It processes human neural recording segments (LFP),
+    converts them to nLFP signals, and uses the ArrayAnalysis class to compute spontaneous maps.
+
+    The results are saved as lightweight pickled objects for further use.
+
+Usage:
+    python main_generate_spontaneous_map.py
+        --analysis_params_dir path/to/analysis_params.yaml
+        --params_dir path/to/data_params.yaml
+        --data_dir path/to/data_or_list.txt
+        --result_dir path/to/save/results
+        [--start_size float] [--end_size float] [--num_steps int]
+        [--good_channels path/to/good_channels.csv]
+
+Arguments:
+    --analysis_params_dir : str
+        Path to YAML file with analysis-specific parameters (e.g., event bin sizes).
+    --params_dir : str
+        Path to YAML file with data loading and preprocessing parameters.
+    --data_dir : str
+        Directory or text file listing input neural data segments.
+    --result_dir : str
+        Directory to save output pickled analysis results.
+    --start_size : float, optional
+        Starting bin size for event detection (default 0.15 seconds).
+    --end_size : float, optional
+        Ending bin size for event detection (default 5.0 seconds).
+    --num_steps : int, optional
+        Number of bin sizes to evaluate between start and end (default 200).
+    --good_channels : str, optional
+        CSV file listing channels to use as "good"; others will be marked deleted.
 """
 import pandas as pd
 

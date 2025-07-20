@@ -1,3 +1,39 @@
+"""
+Script: main_plot_success_rate.py
+
+Author: Radoslav Jochman
+
+Description:
+    This script analyzes a given analysis object alongside behavioral/perceptual data
+    to investigate the relationship between spatial and functional distances of electrode
+    patterns and the corresponding success rates (e.g., correctness of responses).
+    It generates a scatter plot where success rates are color-coded against spatial
+    and functional distance metrics derived from the analysis object and behavioral data.
+
+Usage:
+    python main_plot_success_rate.py
+        --analysis_obj_path path/to/analysis_object.pkl
+        --PCs 3,4
+        --res_dir path/to/output_directory
+        --res_name output_plot.png
+
+Arguments:
+    --analysis_obj_path : str
+        Path to the pickled analysis object containing spontaneous maps and PCs.
+
+    --PCs : str
+        Comma-separated principal components to use in the analysis (e.g., "3,4").
+
+    --res_dir : str
+        Directory where the resulting plot image will be saved.
+
+    --res_name : str
+        Filename for the saved plot image.
+
+Output:
+    - A scatter plot image (PNG) showing success rates as a function of spatial and
+      functional distance metrics, saved at the specified location.
+"""
 import plotting
 import helper
 import argparse
@@ -11,10 +47,6 @@ parser.add_argument("--analysis_obj_path", default=None, type=str, help="Path to
 parser.add_argument("--PCs", default=None, type=str, help="Comma-separated principal components for analysis (e.g., '3,4').")
 parser.add_argument("--res_dir", default=None, type=str, help="Directory path where the resulting plot will be saved.")
 parser.add_argument("--res_name", default=None, type=str, help="Filename for the resulting plot.")
-
-
-
-
 
 def main(args):
     PC1, PC2 = map(int, args.PCs.split(","))

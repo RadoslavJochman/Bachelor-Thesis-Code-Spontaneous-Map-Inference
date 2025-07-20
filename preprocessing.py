@@ -60,8 +60,10 @@ def LFP(path):
         for fq in [50, 100, 150]:
             anasig = butter(anasig, highpass_frequency=(fq + 2) * pq.Hz, lowpass_frequency=(fq - 2) * pq.Hz)
         anasignals.append(anasig.rescale('mV'))
+    anasignals = np.array(anasignals)
+    anasignals = anasignals.reshape((anasignals.shape[0], anasignals.shape[1])).T
     seg = Segment()
-    seg.analogsignals = [anasignals[i] for i in range(len(anasignals))]
+    seg.analogsignals.append(AnalogSignal(np.array(anasignals), units=pq.mV, sampling_rate=1000 * pq.Hz))
     bl = Block()
     bl.segments.append(seg)
     return bl
@@ -87,7 +89,7 @@ def nLFP(LFP_signal, thr_factor, filter, tag='monkey'):
     before_art_removal = []
     trials = [[seg.analogsignals[0].t_start,
                seg.analogsignals[0].t_stop]]
-    iterator = seg.analogsignals if tag == 'human' else seg.analogsignals[0]
+    iterator = seg.analogsignals if tag == 'human' else seg.analogsignals[0].T
     for anasig in iterator:
         anasig = elephant.signal_processing.butter(anasig,
                                                    lowpass_frequency=filter[1] * pq.Hz,

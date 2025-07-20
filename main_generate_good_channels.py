@@ -1,5 +1,41 @@
 """
+Script: filter_spikes.py
+
 Author: Radoslav Jochman
+
+Description:
+    This script filters neural spike train data based on specified quality metrics
+    such as signal-to-noise ratio (SNR), presence ratio, firing rate, and ISI violation ratio.
+
+    It processes NIX files in the given directory, extracts spike train annotations,
+    applies filtering criteria across all datasets, and outputs the channels that
+    meet all criteria as a CSV file.
+
+Usage:
+    python filter_spikes.py
+        --spikes_dir path/to/spikes_data
+        --snr 5.0
+        --presence_ratio 0.9
+        --max_firing_rate 100
+        --min_firing_rate 0.5
+        --isi_violations_ratio 0.1
+        --result_path filtered_channels.csv
+
+Arguments:
+    --spikes_dir : str
+        Directory or text file listing NIX spike data files.
+    --snr : float
+        Minimum signal-to-noise ratio to keep a channel.
+    --presence_ratio : float
+        Minimum presence ratio to keep a channel.
+    --max_firing_rate : float, optional (default: infinity)
+        Maximum firing rate to keep a channel.
+    --min_firing_rate : float, optional (default: 0)
+        Minimum firing rate to keep a channel.
+    --isi_violations_ratio : float
+        Maximum inter-spike interval violation ratio to keep a channel.
+    --result_path : str
+        File path to save the filtered channel IDs as CSV
 """
 import argparse
 import neo

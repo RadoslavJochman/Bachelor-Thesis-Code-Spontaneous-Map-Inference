@@ -376,56 +376,6 @@ def split_segment(segment: neo.Segment, duration_s: int) -> list[neo.Segment]:
         segments.append(s)
     return segments
 
-def calculate_rmse_dist_for_pcs(arr_obj:ArrayAnalysis, ref_obj:ArrayAnalysis, PCs: list ):
-    """
-    Computes the RMSE between spontaneous maps for each unique pair of principal components (PCs) from two ArrayAnalysis objects.
-
-    Parameters:
-          arr_obj (ArrayAnalysis): The analysis object for which the spontaneous map is computed using each PC pair.
-          ref_obj (ArrayAnalysis): The reference analysis object for which the spontaneous map is computed using each PC pair.
-          PCs (list): A list of principal component; at least two must be provided.
-
-    Returns:
-      pd.DataFrame: A DataFrame with columns "PCs" (PC pair as a string, e.g., "3,4") and "rmse" (the computed RMSE value for that pair).
-
-    Raises:
-      ArgumentError: If fewer than 2 principal components are provided in the PCs list.
-    """
-    if len(PCs)<2:
-        raise ArgumentError(message="Need at least 2 PCs.")
-    result_PCs = []
-    result_rmse = []
-    result = pd.DataFrame()
-    for PC1 in PCs:
-        for PC2 in PCs:
-            if PC1<PC2:
-                arr_obj.compute_new_PC(PC1, PC2)
-                ref_obj.compute_new_PC(PC1, PC2)
-                ref_map = ref_obj.spontaneous_map
-                arr_map = arr_obj.spontaneous_map
-                arr_map = find_ideal_rotation(ref_map,arr_map)
-                result_PCs.append(f"{PC1},{PC2}")
-                result_rmse.append(rmse_angles(ref_map,arr_map))
-    result["PCs"] = result_PCs
-    result["rmse"] = result_rmse
-    return result
-
-def filter_paths_by_TH(paths: list[str], TH: int):
-    """Return file paths whose filename contains the threshold value (as string) immediately following 'fac'."""
-    filtered_paths = []
-    for path in paths:
-        if(get_TH(path)!=None and get_TH(path)==str(TH)):
-            filtered_paths.append(path)
-    return filtered_paths
-
-def filter_paths_by_bin_size(paths: list[str], bin_size: int):
-    """Return file paths whose filename contains the bin size (as string) immediately following 'bin_size'."""
-    filtered_paths = []
-    for path in paths:
-        if(get_bin_size(path)!=None and get_bin_size(path)==str(bin_size)):
-            filtered_paths.append(path)
-    return filtered_paths
-
 def get_TH(path):
     """Extract and return the threshold value from the filename after 'fac', or None if not found."""
     file_name = os.path.basename(path)
@@ -569,7 +519,6 @@ def extract_signal_eyes_closed(segment: neo.Segment, metadata, min_eyes_closed: 
     new_seg = neo.Segment()
     new_seg.analogsignals.append(neo.core.AnalogSignal(np.array(new_sigs), units='uV', sampling_rate=fs * Hz).T)
     return new_seg
-
 
 def extract_signal_eyes_opened(segment: neo.Segment, metadata):
     """

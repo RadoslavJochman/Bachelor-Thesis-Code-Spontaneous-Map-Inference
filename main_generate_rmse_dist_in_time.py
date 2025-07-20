@@ -1,5 +1,33 @@
 """
+Script: compute_intrasample_rmse.py
+
 Author: Radoslav Jochman
+
+Description:
+    This script calculates the RMSE between spontaneous maps
+    of all pairwise combinations of time points within a single sample.
+
+    It aligns the maps using an optimal rotation before computing RMSE.
+
+Usage:
+    python compute_intrasample_rmse.py
+        --data_location path/to/sample_data
+        --result_dir path/to/output
+        --sample_name SampleA
+
+Arguments:
+    --data_location : str
+        Directory or text file containing paths to .pkl files for each time point of the sample.
+    --result_dir : str
+        Directory where the resulting CSV will be saved.
+    --sample_name : str
+        Name of the sample being analyzed; used in output CSV filename and labeling.
+
+Output:
+    A CSV file named `<sample_name>.csv` containing:
+        - sample: name of the sample
+        - time_diff: absolute difference in time indices
+        - RMSE: RMSE between aligned spontaneous maps
 """
 import argparse
 import itertools

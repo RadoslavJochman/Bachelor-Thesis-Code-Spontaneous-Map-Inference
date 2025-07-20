@@ -1,5 +1,48 @@
 """
+Script: run_human_pipeline.py
+
 Author: Radoslav Jochman
+
+Description:
+    This script executes a full processing pipeline for human intracranial LFP recordings. It converts
+    raw LFP signals into (nLFPs), splits the data into time segments, and computes
+    spontaneous activity maps across a range of bin sizes. Results are saved as lightweight pickled
+    `ArrayAnalysis` objects for further inspection or visualization.
+
+    Configuration is done using YAML files that define both data preprocessing and analysis-specific
+    parameters.
+
+Usage:
+    python run_human_pipeline.py
+        --analysis_params_dir path/to/analysis_params.yaml
+        --params_dir path/to/preprocessing_params.yaml
+        --data_dir path/to/data_or_list.txt
+        --result_dir path/to/output
+        --start_size 0.15
+        --end_size 5.0
+        --num_steps 200
+        --segment_size 300
+        --good_channels path/to/good_channels.csv
+
+Arguments:
+    --analysis_params_dir : str
+        Path to a YAML file containing analysis-specific parameters (e.g., bin size, thresholding strategy).
+    --params_dir : str
+        Path to a YAML file containing preprocessing parameters (e.g., filtering, normalization).
+    --data_dir : str
+        Directory containing input LFP data files or a text file listing file paths.
+    --result_dir : str
+        Directory where output `.pkl` files with analysis results will be saved.
+    --start_size / --end_size / --num_steps : float/int
+        Defines the range and resolution of bin sizes (in seconds) to scan for spontaneous activity.
+    --segment_size : int
+        Duration (in seconds) of data segments to split recordings into for analysis.
+    --good_channels : str
+        CSV file with a list of valid channel indices. Remaining channels will be excluded from analysis.
+
+Output:
+    - Directory structure: `<result_dir>/sub_sample_<index>/TH_fac_<factor>_bin_size_<bin_size>.pkl`
+    - Each file contains an `ArrayAnalysis` object with metadata and results.
 """
 import os
 

@@ -1,5 +1,5 @@
 """
-Script: run_human_pipeline.py
+Script: main_params_analysis.py
 
 Author: Radoslav Jochman
 
@@ -13,7 +13,7 @@ Description:
     parameters.
 
 Usage:
-    python run_human_pipeline.py
+    python main_params_analysis.py
         --analysis_params_dir path/to/analysis_params.yaml
         --params_dir path/to/preprocessing_params.yaml
         --data_dir path/to/data_or_list.txt

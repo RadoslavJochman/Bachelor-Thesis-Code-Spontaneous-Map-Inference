@@ -127,21 +127,37 @@ def ggplot_spontaneous_map_human(analysis_array, ref):
 
     return p
 
-def ggplot_heatmap_param(df_results):
+def ggplot_heatmap_param(df_results:pd.DataFrame):
     """
-    Expects df_results to have columns:
-      - bin_size (float)
-      - TH (e.g. -1, -2, -3)
-      - PC_pair (string like "0-1", "0-2", etc.)
-      - RMSE (float)
+    Generates a faceted heatmap visualizing RMSE across different analysis parameters.
 
-    Creates a faceted heatmap:
-      - x-axis: bin_size (continuous)
-      - y-axis: threshold (discrete)
-      - fill: RMSE
-      - one facet per PC_pair
+    This function takes a DataFrame containing the results of a grid search or parameter
+    sweep and creates a faceted heatmap using `plotnine` (ggplot-style syntax). Each facet
+    corresponds to a threshold (TH) value, and the heatmap visualizes the RMSE values for
+    different combinations of PCA component pairs and bin sizes.
+
+    Parameters
+    ----------
+    df_results : pd.DataFrame
+        DataFrame with the following required columns:
+            - 'bin_size' : float
+                The size of time bins used in analysis.
+            - 'TH' : int or str
+                Threshold parameter for signal processing (e.g., -1, -2, etc.).
+            - 'PC_pair' : str
+                Principal component pair, formatted like "0,1", "0,2", etc.
+            - 'RMSE' : float
+                Root Mean Square Error associated with each parameter combination.
+
+    Returns
+    -------
+    plotnine.ggplot.ggplot
+        A ggplot-style heatmap plot with:
+            - X-axis: PC_pair (categorical)
+            - Y-axis: bin_size (continuous)
+            - Fill: RMSE (color-mapped using inferno colormap)
+            - Facets: One per TH value
     """
-
 
     df_plot = df_results.copy()
     df_plot['TH'] = df_plot['TH'].astype(str)
@@ -182,19 +198,46 @@ def ggplot_heatmap_param(df_results):
     )
     return p
 
-def ggplot_average_heatmap_param(df_results, title: str):
+def ggplot_average_heatmap_param(df_results:pd.DataFrame, title: str):
     """
-    Expects df_results to have columns:
-      - bin_size (float)
-      - TH (e.g. -1, -2, -3)
-      - PC_pair (string like "0-1", "0-2", etc.)
-      - RMSE (float)
+    Generates a faceted heatmap of the average RMSE values across parameter combinations.
 
-    Creates a faceted heatmap:
-      - x-axis: bin_size (continuous)
-      - y-axis: threshold (discrete)
-      - fill: Mean RMSE
-      - one facet per PC_pair
+    This function aggregates RMSE values by computing the mean for each combination of
+    bin size, threshold (TH), and PCA component pair (PC_pair). It then creates a
+    faceted heatmap where each facet corresponds to a different threshold value, allowing
+    visual comparison of performance across conditions.
+
+    Parameters
+    ----------
+    df_results : pd.DataFrame
+        DataFrame with the following required columns:
+            - 'bin_size' : float
+                Size of the time bin used in the analysis.
+            - 'TH' : int or str
+                Threshold value applied during signal preprocessing (e.g., -1, -2, -3).
+            - 'PC_pair' : str
+                Pair of principal components compared, formatted like "0,1", "0,2", etc.
+            - 'RMSE' : float
+                Root Mean Square Error metric for each parameter combination.
+    title : str
+        Title of the resulting plot.
+
+    Returns
+    -------
+    plotnine.ggplot.ggplot
+        A ggplot-style heatmap plot with:
+            - X-axis: PC_pair (categorical)
+            - Y-axis: bin_size (continuous)
+            - Fill: Mean RMSE (color-mapped using reversed inferno colormap)
+            - Facets: One per threshold value (TH)
+
+    Notes
+    -----
+    - Only bin sizes that are multiples of 0.1 (with tolerance) are included for cleaner visualization.
+    - RMSE values are averaged per unique (bin_size, TH, PC_pair) combination.
+    - Uses `geom_raster` for better performance on dense grids.
+    - Color limits for RMSE are clipped to the fixed range (can be changed as needed) for consistency.
+    - Includes customized themes for axis labels, title size, tick orientation, and legend formatting.
     """
 
 
@@ -209,7 +252,6 @@ def ggplot_average_heatmap_param(df_results, title: str):
         df_results.groupby(['bin_size', 'TH', 'PC_pair'], as_index=False)
         .agg(mean_RMSE=('RMSE', 'mean'))
     )
-    print(f"Average max {df_summary['mean_RMSE'].max()}\n min {df_summary['mean_RMSE'].min()}")
     #Define labels for facets using TH values
     th_labels = {}
     for TH in df_plot['TH']:
@@ -251,20 +293,46 @@ def ggplot_average_heatmap_param(df_results, title: str):
     )
     return p
 
-def ggplot_std_heatmap_param(df_results, title: str):
+def ggplot_std_heatmap_param(df_results:pd.DataFrame, title: str):
     """
-    Expects df_results to have columns:
-      - bin_size (float)
-      - TH (e.g. -1, -2, -3)
-      - PC_pair (string like "0-1", "0-2", etc.)
-      - RMSE (float)
+        Generates a faceted heatmap visualizing the standard error of RMSE across parameter combinations.
 
-    Creates a faceted heatmap:
-      - x-axis: bin_size (continuous)
-      - y-axis: threshold (discrete)
-      - fill: Mean RMSE
-      - one facet per PC_pair
-    """
+        This function computes the standard error of the RMSE (Root Mean Square Error) for each
+        combination of bin size, threshold (TH), and PCA component pair (PC_pair), and visualizes
+        the results using a faceted heatmap. Each facet corresponds to a unique threshold value,
+        enabling comparison of variability in RMSE estimates across different conditions.
+
+        Parameters
+        ----------
+        df_results : pd.DataFrame
+            DataFrame containing the following required columns:
+                - 'bin_size' : float
+                    Time bin size used during analysis.
+                - 'TH' : int or str
+                    Threshold value for spike detection or other filtering (e.g., -1, -2, etc.).
+                - 'PC_pair' : str
+                    Principal component pair label (e.g., "0-1", "0-2").
+                - 'RMSE' : float
+                    Root Mean Square Error computed for each parameter combination.
+        title : str
+            Title of the resulting plot.
+
+        Returns
+        -------
+        plotnine.ggplot.ggplot
+            A ggplot-style faceted heatmap where:
+                - X-axis: PC_pair (categorical)
+                - Y-axis: bin_size (continuous)
+                - Fill: Standard error of RMSE
+                - Facets: One per threshold (TH)
+
+        Notes
+        -----
+        - Filters bin sizes to retain only those close to a multiple of 0.1s (with tolerance).
+        - Computes mean, standard deviation, count, and standard error for RMSE in each group.
+        - Uses a reversed 'inferno' colormap with fixed capped limits for consistent scaling.
+        - Enhances figure aesthetics with custom legend position, font sizes, and facet labels.
+        """
 
 
     df_plot = df_results.copy()
@@ -283,7 +351,6 @@ def ggplot_std_heatmap_param(df_results, title: str):
 
     # Calculate standard error
     df_summary['se'] = df_summary['std_RMSE'] / (df_summary['count'] ** 0.5)
-    print(f"Standard error max {df_summary['se'].max()}\n min {df_summary['se'].min()}")
     #Define labels for facets using TH values
     th_labels = {}
     for TH in df_plot['TH']:
@@ -326,67 +393,38 @@ def ggplot_std_heatmap_param(df_results, title: str):
     )
     return p
 
-def ggplot_lineband_param(df_results):
+def ggplot_success_rate(df:pd.DataFrame):
     """
-    Expects a DataFrame with columns:
-      - bin_size: numeric (e.g., 0.15, 0.20, ..., 5.0)
-      - TH: numeric or categorical (e.g., -1, -2, -3)
-      - PC_pair: string (e.g., "0-1", "0-2", etc.)
-      - RMSE: numeric error value
-      - sample: identifier for each sample (so there can be multiple RMSE values per combination)
+    Creates a scatter plot showing the relationship between spatial and functional distance,
+    with success rate represented as color.
 
-    This function groups the data by bin_size, TH, and PC_pair, computes the mean RMSE
-    and the standard error (SE) across samples, then plots the mean RMSE with error bars.
+    This function uses `plotnine` to generate a scatter plot from a DataFrame containing
+    spatial and functional distances between channel pairs (or other units), and visualizes
+    a success metric on a continuous color scale (viridis colormap).
 
-    Returns a plotnine object.
-    """
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A DataFrame with the following required columns:
+            - 'spatial_distance' : float
+                Distance between pairs in physical space (x-axis).
+            - 'functional_distance' : float
+                Distance between pairs in functional space (y-axis).
+            - 'success_rate' : float
+                A success metric between 0 and 1, visualized as color.
 
-    # Group by parameters and compute summary statistics
-    df_summary = (
-        df_results.groupby(['bin_size', 'TH', 'PC_pair'], as_index=False)
-        .agg(mean_RMSE=('RMSE', 'mean'),
-             sd_RMSE=('RMSE', 'std'),
-             n_samples=('RMSE', 'count'))
-    )
-    # Compute standard error
-    df_summary['se_RMSE'] = df_summary['sd_RMSE'] / df_summary['n_samples'] ** 0.5
+    Returns
+    -------
+    plotnine.ggplot.ggplot
+        A `plotnine` scatter plot with:
+            - X-axis: spatial_distance
+            - Y-axis: functional_distance
+            - Point color: success_rate (mapped to a viridis color gradient)
 
-    # Define x-axis breaks (you can adjust as needed)
-    x_breaks = np.arange(np.min(df_summary["bin_size"]), np.max(df_summary["bin_size"]), 0.5)
-    #df_summary = df_summary[df_summary["PC_pair"].isin(["0,1", "0,2", "0,3","0,4","1,2","1,3","1,4","2,3",""])]
-
-    p = (ggplot(df_summary, aes(x='bin_size'))
-         # Ribbon for the uncertainty band:
-         + geom_ribbon(aes(ymin='mean_RMSE - sd_RMSE', ymax='mean_RMSE + sd_RMSE'),
-                       fill="blue", alpha=0.3)
-         # Line for the mean RMSE:
-         + geom_line(aes(y='mean_RMSE'), color='blue', size=0.8)
-         + facet_grid('TH ~ PC_pair',)
-         + scale_x_continuous(breaks=x_breaks)
-         + labs(title="Mean RMSE with Uncertainty Band",
-                x="Bin Size",
-                y="Mean RMSE")
-         + theme_minimal()
-         + theme(axis_text_x=element_text(angle=90, hjust=1, vjust=0.5),
-                 panel_background=element_text(fill='white'),
-                 plot_background=element_text(fill='white'),
-                 legend_position='none',
-                 figure_size=(24, 8)
-                 )
-    )
-    return p
-
-def ggplot_success_rate(df):
-    """
-    Expects a DataFrame with columns:
-      - spatial_distance: Numeric values for spatial distance (x-axis)
-      - functional_distance: Numeric values for functional distance (y-axis)
-      - success_rate: Numeric values (0 to 1) mapped to color
-
-    Returns a plotnine object with a scatter plot:
-      - x-axis: Spatial distance
-      - y-axis: Functional distance
-      - Color: Success rate using a viridis-like continuous color scale
+    Notes
+    -----
+    - The `success_rate` is color-mapped using a 256-color viridis gradient.
+    - The color scale is fixed between 0 and 1 for interpretability.
     """
     # Create a viridis colormap using matplotlib and convert it to a list of hex colors.
     n_colors = 256
@@ -407,13 +445,35 @@ def ggplot_success_rate(df):
 
 def ggplot_mean_rmse_bar(df: pd.DataFrame):
     """
-    Plots the mean RMSE for each time_diff as a bar chart with error bars.
+    Creates a bar chart showing the mean RMSE for each temporal distance, with error bars
+    representing the standard error of the mean.
 
-    Parameters:
-        df (pd.DataFrame): DataFrame with columns "sample", "time_diff", and "RMSE".
+    This function groups the input DataFrame by `time_diff`, computes the mean and standard
+    error of the `RMSE` within each group, and visualizes the result using a bar chart.
 
-    Returns:
-        plotnine.ggplot: A ggplot object representing the bar chart.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A DataFrame containing the following columns:
+            - 'sample' : any
+                Identifier for individual data points (not directly used in the plot).
+            - 'time_diff' : float or int
+                Temporal distance (e.g., minutes) between observations. Used as the x-axis.
+            - 'RMSE' : float
+                Root Mean Square Error values. Used to compute means and error bars.
+
+    Returns
+    -------
+    plotnine.ggplot.ggplot
+        A ggplot object representing the bar chart with:
+            - X-axis: time_diff
+            - Y-axis: mean RMSE
+            - Bars: mean RMSE per time_diff
+            - Error bars: ±1 standard error of the mean RMSE
+
+    Notes
+    -----
+    - The y-axis is constrained to the fixed range for consistent visual scaling.
     """
     # Group by time_diff and calculate mean, standard deviation, and count
     df_summary = df.groupby("time_diff", as_index=False).agg(

@@ -1,5 +1,46 @@
 """
+Script: main_plot_average_heatmap_param.py
+
 Author: Radoslav Jochman
+
+Description:
+    This script generates visualizations (heatmaps) of RMSE values from a CSV file created by
+    `main_generate_rmse_dist_2samples_param.py`. It produces two heatmaps:
+    - The average RMSE for each PC pair, threshold and bin size.
+    - The standard error (STE) of the RMSE for each PC pair, threshold and bin size.
+
+    The script uses `ggplot`-based plotting functions defined in the `plotting` module.
+
+Usage:
+    python main_plot_average_heatmap_param.py
+        --data_location path/to/rmse_data.csv
+        --result_dir path/to/output
+        --result_name name_for_output_files
+        --average_title "Average RMSE Heatmap"
+        --ste_title "STE RMSE Heatmap"
+
+Arguments:
+    --data_location : str
+        Path to the `.csv` file containing the RMSE distributions (must be generated previously using `main_generate_rmse_dist_2samples_param.py`).
+
+    --result_dir : str
+        Directory where the output `.png` or `.pdf` files will be saved.
+
+    --result_name : str
+        Base filename for the output images (e.g., `"rmse_monkey"` results in `average_rmse_monkey.png` and `ste_rmse_monkey.png`).
+
+    --average_title : str
+        Title used in the average RMSE heatmap.
+
+    --ste_title : str
+        Title used in the standard error of the RMSE heatmap.
+
+Output:
+    - `average_<result_name>.png`: Heatmap showing average RMSE across bin sizes and PC pairs.
+    - `ste_<result_name>.png`: Heatmap showing standard error of RMSE for the same combinations.
+
+Requirements:
+    - The CSV file must have the following columns: `sample`, `bin_size`, `PC_pair`, `TH`, `RMSE`.
 """
 import plotting
 import argparse

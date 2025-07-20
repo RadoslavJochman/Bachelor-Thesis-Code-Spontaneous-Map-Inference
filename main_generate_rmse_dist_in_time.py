@@ -1,5 +1,5 @@
 """
-Script: compute_intrasample_rmse.py
+Script: main_generate_rmse_dist_in_time.py
 
 Author: Radoslav Jochman
 
@@ -10,7 +10,7 @@ Description:
     It aligns the maps using an optimal rotation before computing RMSE.
 
 Usage:
-    python compute_intrasample_rmse.py
+    python main_generate_rmse_dist_in_time.py
         --data_location path/to/sample_data
         --result_dir path/to/output
         --sample_name SampleA

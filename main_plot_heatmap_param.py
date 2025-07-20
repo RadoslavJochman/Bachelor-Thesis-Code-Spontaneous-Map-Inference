@@ -1,5 +1,34 @@
 """
+Script: main_plot_heatmap_param.py
+
 Author: Radoslav Jochman
+
+Description:
+    This script generates a single heatmap visualization from a CSV file containing RMSE distributions.
+    The heatmap is created using a `ggplot`-based function defined in the `plotting` module and saved
+    to the specified output directory.
+
+Usage:
+    python main_plot_heatmap_param.py
+        --data_location path/to/rmse_data.csv
+        --result_dir path/to/output
+        --result_name output_filename
+
+Arguments:
+    --data_location : str
+        Path to the `.csv` file containing RMSE distribution data.
+
+    --result_dir : str
+        Path to the directory where the output image will be saved.
+
+    --result_name : str
+        Filename (with or without extension) to use for the saved heatmap.
+
+Output:
+    - A heatmap image (e.g., `rmse_heatmap.png`) visualizing RMSE values across PC pairs and bin sizes.
+
+Requirements:
+    - The CSV file must contain all necessary columns for plotting (e.g., PC pairs, bin sizes, RMSE).
 """
 import plotting
 import argparse

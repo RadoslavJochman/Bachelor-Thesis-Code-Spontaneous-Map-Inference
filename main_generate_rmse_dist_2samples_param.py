@@ -1,5 +1,32 @@
 """
+Script: main_generate_rmse_dist_2samples_param.py
+
 Author: Radoslav Jochman
+
+Description:
+    This script computes the RMSE (Root Mean Square Error) distribution between two samples
+     based on specified Principal Components (PCs).
+
+
+Usage:
+    python main_generate_rmse_dist_2samples_param.py
+        --data_location path/to/sample_data
+        --ref_sample_location path/to/reference_data
+        --result_dir path/to/output
+        --PCs 1,2
+        --sample_name SampleA
+
+Arguments:
+    --data_location : str
+        Directory or text file containing paths to the .pkl files representing the sample.
+    --ref_sample_location : str
+        Directory or text file containing paths to the .pkl files of reference samples.
+    --result_dir : str
+        Path to directory where the result CSV will be saved.
+    --PCs : str
+        Comma-separated list of principal component indices (e.g., "1,2").
+    --sample_name : str
+        Name identifier for the sample being analyzed; used as the CSV file name.
 """
 import argparse
 import helper

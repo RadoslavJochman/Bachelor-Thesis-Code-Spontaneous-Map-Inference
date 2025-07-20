@@ -43,12 +43,13 @@ import itertools
 from argparse import ArgumentError
 import neo
 import numpy as np
-from array_analysis import ArrayAnalysis, load_object
+from array_analysis import ArrayAnalysis, load_object, METHODS
 import os
 import preprocessing
 import pandas as pd
 from blackrock_utilities.brpylib             import NevFile, NsxFile, brpylib_ver
 from quantities import  Hz
+import yaml
 
 def distance_in_space(pattern1, pattern2, array_obj: ArrayAnalysis):
     '''
@@ -218,8 +219,8 @@ def segments_subtract_mean(segments):
             zero mean across channels at each time point.
     """
     for segment in segments:
-        analog_signal = np.array(segment.analogsignals).squeeze()
-        segment.analogsignals = analog_signal - np.mean(analog_signal,axis=0)
+        analog_signal = segment.analogsignals[0]
+        segment.analogsignals[0] = (analog_signal.T - np.mean(analog_signal, axis=1)).T
     return segments
 
 def load_human_segments(data_location: str, params: dict):
@@ -286,10 +287,10 @@ def process_LFP_to_nLFP(segments: list, params: dict):
     # subtract signal mean of from all channels
     if 'subtract_mean' in params.keys() and params['subtract_mean']:
         segments = segments_subtract_mean(segments)
-        segments = [preprocessing.nLFP(segment, params['threshold_factor'], params['filter'],tag="human").segments[0]
+        segments = [preprocessing.nLFP(segment, params['threshold_factor'], params['filter']).segments[0]
                     for segment in segments]
     else:
-        segments = [preprocessing.nLFP(segment, params['threshold_factor'], params['filter'],tag="human").segments[0]
+        segments = [preprocessing.nLFP(segment, params['threshold_factor'], params['filter']).segments[0]
                     for segment in segments]
     return segments
 
@@ -339,7 +340,7 @@ def extract_paths(data_location: str, extension: str=None):
             paths = [p.strip() for p in paths if extension is None or extension in p]
     else:
         paths = os.listdir(data_location)
-        paths = [f'{data_location}/{name}' for name in paths if ".pkl" in name]
+        paths = [f'{data_location}/{name}' for name in paths if extension is None or extension in name]
     return paths
 
 def split_segment(segment: neo.Segment, duration_s: int) -> list[neo.Segment]:
@@ -371,7 +372,7 @@ def split_segment(segment: neo.Segment, duration_s: int) -> list[neo.Segment]:
     duration_per_sample = int(duration_num_values//num_samples)
     for i in range(num_samples):
         s = neo.Segment()
-        s.analogsignals = [neo.AnalogSignal(ansigs[j][i*duration_per_sample:(i+1)*duration_per_sample,:], units=units, sampling_rate=fq) for j in range(len(segment.analogsignals))]
+        s.analogsignals = [neo.AnalogSignal(ansigs[0][i*duration_per_sample:(i+1)*duration_per_sample,:], units=units, sampling_rate=fq)]
         segments.append(s)
     return segments
 
@@ -548,3 +549,93 @@ def calculate_rmse_distr_sample_and_ref_sample(paths: list[str],PCs: list[int], 
     result = pd.DataFrame(results_list, columns=["sample", "bin_size", "PC_pair", "TH", "RMSE"])
 
     return result
+
+def extract_signal_eyes_closed(segment: neo.Segment, metadata, min_eyes_closed: int):
+    """
+    Extract analog signals where monkey had eyes closed for
+    at least given interval in params['min_eyes_closed']
+    """
+    fs = segment.analogsignals[0].sampling_rate.magnitude
+
+    an_sigs = np.array(segment.analogsignals[0].magnitude)
+    new_sigs = [[] for _ in range(64)]
+    t_start, t_stop, duration, state = metadata["t_start"], metadata["t_stop"], metadata["dur"], metadata["state"]
+    for i in range(len(state)):
+        if state[i] == "Closed_eyes" and duration[i] >= min_eyes_closed:
+            start_ix = int(t_start[i] * fs)
+            stop_ix = int(t_stop[i] * fs)
+            for j in range(64):
+                new_sigs[j].extend((an_sigs[start_ix:stop_ix, j]).tolist())
+    new_seg = neo.Segment()
+    new_seg.analogsignals.append(neo.core.AnalogSignal(np.array(new_sigs), units='uV', sampling_rate=fs * Hz).T)
+    return new_seg
+
+
+def extract_signal_eyes_opened(segment: neo.Segment, metadata):
+    """
+    Extract analog signals where monkey had eyes opened
+    """
+    fs = segment.analogsignals[0].sampling_rate.magnitude
+
+    an_sigs = np.array(segment.analogsignals[0].magnitude)
+    new_sigs = [[] for _ in range(64)]
+    t_start, t_stop, duration, state = metadata["t_start"], metadata["t_stop"], metadata["dur"], metadata["state"]
+    for i in range(len(state)):
+        if state[i] == "Open_eyes":
+            start_ix = int(t_start[i] * fs)
+            stop_ix = int(t_stop[i] * fs)
+            for j in range(64):
+                new_sigs[j].extend((an_sigs[start_ix:stop_ix, j]).tolist())
+    new_seg = neo.Segment()
+    new_seg.analogsignals.append(neo.core.AnalogSignal(np.array(new_sigs), units='uV', sampling_rate=fs * Hz).T)
+    return new_seg
+
+def load_monkey_segments(metadata, data_type, data_folder, **kwargs):
+    """
+    Loads and processes monkey LFP or nLFP segments from a specified folder.
+
+    This function loads neural signal segments (LFP or nLFP) from NIX files located
+    in `data_folder`. Each segment corresponds to a recording session. Optionally,
+    the segments can be filtered to include only periods where the monkey's eyes
+    were closed or opened, based on the `metadata`.
+
+    Parameters
+    ----------
+    metadata : pd.DataFrame
+        DataFrame containing behavioral annotations, including eye state periods.
+    data_type : METHODS
+        Type of neural data to load. Must be `METHODS.LFP` or `METHODS.nLFP`.
+    data_folder : str or Path
+        Path to the folder containing NIX files with the neural recordings.
+    **kwargs : dict, optional
+        Optional parameters:
+        - min_eyes_closed : int
+            Minimum duration (in seconds) of eyes-closed periods to include.
+            If set to -2, selects eyes-opened periods instead.
+
+    Returns
+    -------
+    segments : list of neo.core.Segment
+        List of `neo.Segment` objects, one per recording, optionally filtered
+        by eye state.
+
+    Raises
+    ------
+    ArgumentError
+        If the specified `data_type` is not `LFP` or `nLFP`.
+    """
+    # load segments
+    if data_type == METHODS.LFP or data_type == METHODS.nLFP:
+        paths = extract_paths(data_folder)
+        segments = [neo.NixIO(path, "ro").read_block().segments[0] for path in paths]
+    else:
+        raise ArgumentError("Works only for LFP or nLFP")
+
+    # extract eyes closed periods
+    if 'min_eyes_closed' in kwargs.keys() and kwargs['min_eyes_closed'] >= 0:
+        for i in range(len(segments)):
+            segments[i] = extract_signal_eyes_closed(segments[i], metadata, kwargs['min_eyes_closed'])
+    elif 'min_eyes_closed' in kwargs.keys() and kwargs['min_eyes_closed'] == -2:
+        for i in range(len(segments)):
+            segments[i] = extract_signal_eyes_opened(segments[i], metadata)
+    return segments

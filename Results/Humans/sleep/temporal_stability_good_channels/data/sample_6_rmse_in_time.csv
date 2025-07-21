@@ -1,0 +1,11 @@
+,sample,time_diff,RMSE
+0,sample_6_rmse_in_time,2,0.004399109536933119
+1,sample_6_rmse_in_time,4,0.04524798380845469
+2,sample_6_rmse_in_time,6,0.006284442195618758
+3,sample_6_rmse_in_time,8,0.002513776878247528
+4,sample_6_rmse_in_time,2,0.013197328610799348
+5,sample_6_rmse_in_time,4,0.02953687831940795
+6,sample_6_rmse_in_time,6,0.001885332658685622
+7,sample_6_rmse_in_time,2,0.011311995952113713
+8,sample_6_rmse_in_time,4,0.047761760686702015
+9,sample_6_rmse_in_time,2,0.027651545660722508

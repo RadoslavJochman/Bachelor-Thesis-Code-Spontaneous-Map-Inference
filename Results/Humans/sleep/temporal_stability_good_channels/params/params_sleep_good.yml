@@ -1,0 +1,7 @@
+filter: [1, 150]
+subtract_mean: True  # reference mean
+z-score: False
+threshold_factor: -1  # nLFP threshold
+
+layout_path: "/home/jochman/my_code/python/metadata/blind_electrodes_positions.csv"
+

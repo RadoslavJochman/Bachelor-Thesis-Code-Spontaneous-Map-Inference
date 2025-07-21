@@ -1,0 +1,4 @@
+target_PCA_dims: [1, 2]
+event_binsize: 0.5
+interpolation_factor: 3
+overlap_frames: True
